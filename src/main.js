@@ -11,7 +11,8 @@ import { Sound, store } from './sound.js';
 const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
 const coarse = window.matchMedia?.('(pointer: coarse)').matches ?? false;
 const params = new URLSearchParams(location.search);
-let particles = Number(params.get('particles')) || (coarse ? 30000 : 70000);
+const tv = params.has('tv') || /FireTVApp|AFT/.test(navigator.userAgent);
+let particles = Number(params.get('particles')) || (tv ? 25000 : coarse ? 30000 : 70000);
 
 const hud = createHud(store);
 hud.sound(Sound.muted);

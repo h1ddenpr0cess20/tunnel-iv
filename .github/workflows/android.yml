@@ -1,0 +1,37 @@
+name: Fire TV APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [claude/sleepy-thompson-xymlr2]
+    paths: ['android/**', 'src/**', 'index.html', 'package.json', '.github/workflows/android.yml']
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: Copy the build into the app
+        run: |
+          mkdir -p android/app/src/main/assets
+          cp -r dist android/app/src/main/assets/www
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: 8.9
+      - name: Build debug APK
+        working-directory: android
+        run: gradle --no-daemon assembleDebug
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tunnel-iv-firetv-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
