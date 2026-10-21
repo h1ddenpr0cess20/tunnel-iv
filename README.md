@@ -36,6 +36,9 @@ npm run dev      # http://localhost:5173
 npm run build    # static build in dist/
 ```
 
+The build is plain static files (relative paths), so any static host
+can serve `dist/` as it is.
+
 Needs WebGPU or WebGL 2 (any current browser). `?renderer=webgl` or
 `?renderer=webgpu` pins one, and `?particles=40000` sets how much snow
 there is (it otherwise starts at 70,000, or 30,000 on phones, and thins
