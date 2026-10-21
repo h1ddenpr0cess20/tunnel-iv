@@ -68,25 +68,26 @@ go by.
 
 ## Sound
 
-All made as it plays, with Web Audio, no samples: heavy metal, a
-galloping highway anthem in E minor at 160 beats a minute, after the
-[Madness Engine](https://github.com/h1ddenpr0cess20/madness-engine)'s
-band (Metroll's). The rhythm guitars are a wall: power chords of detuned
-saws, one rig hard left and one hard right a hair late, the mids pushed
-into a hard clipper, the lows put back for the chug, the middle scooped,
-the fizz rolled off; palm-muted, they're darkened before the amp so they
-thud. They gallop through the verses, chug sixteenths into the choruses
-and ring wide open in them. Two lead guitars play the hooks in harmony a
-third apart, bend into their long notes and dive off the whammy bar, and
-one shreds the solo. The bass drives eighths and steps into each change.
-The drums are a metal kit (the beater's click on the kick, a cracking
-snare, toms, a china): the gallop in the verses, a skank beat building
-into the choruses, double bass under them, a half-time breakdown, a fill
-into every change. A dark string pad hangs over the choruses. When you
-crash, the band hits one last chord and the lead dives off the end of the
-whammy bar. Under it all: the diesel changing gear, the blade scraping
-the road, the blizzard howling round the cab, the air horn and the
-wipers.
+All made as it plays, with Web Audio, no samples. The band plays the
+game's song, "Whiteout on the Highway": hard, driving metal in D minor at
+185 beats a minute, the guitars in drop D, the verses going D, B flat, A,
+the choruses D, B flat, C. The vocal hook is sung by two lead guitars in
+harmony a third apart, up to a belted high B flat and a long high E that
+slides down to D. It opens on one held, bent high D; there's a half-time
+bridge that lifts back up, and a solo of long bends and runs. The sound is
+after the [Madness Engine](https://github.com/h1ddenpr0cess20/madness-engine)'s
+band (Metroll's): the rhythm guitars a wall of detuned-saw power chords,
+one rig hard left and one hard right a hair late, the mids pushed into a
+hard clipper, the lows put back, the middle scooped; palm-muted, they're
+darkened before the amp so they thud. The bass drives eighths and steps
+into each change. The drums are a metal kit (the beater's click on the
+kick, a cracking snare, toms, a china), driving eighths on the kick in the
+choruses, double bass under the solo, a fill into every change. A dark
+string pad hangs over the choruses. The band is scheduled a second ahead
+on its own timer, so a slow frame can't make it stumble. When you crash,
+it hits one last chord and the lead dives off the end of the whammy bar.
+Under it all: the diesel changing gear, the blade scraping the road, the
+blizzard howling round the cab, the air horn and the wipers.
 
 ## Layout
 

@@ -1,32 +1,35 @@
 // Synthesized sound, no samples. Audio starts on the first key press or tap.
 //
-// The band: heavy metal, a galloping highway anthem in E at 160 beats a
-// minute, after the Madness Engine's band (Metroll's). Two rhythm
-// guitars, hard left and right, the right a hair late, are a wall:
-// power chords of detuned saws, the mids pushed into a hard clipper, the
-// lows put back, the middle scooped, the fizz rolled off; palm-muted they
-// thud, darkened before the amp. They gallop through the verses, chug
-// sixteenths into the choruses and ring wide open in them. Two lead
-// guitars play the hooks in harmony a third apart, bend into their long
-// notes and dive off the whammy bar; one of them shreds the solo. The
+// The band plays the game's song, "Whiteout on the Highway": hard,
+// driving metal in D minor at 185 beats a minute, the guitars in drop D,
+// the verses going D, B flat, A, the choruses D, B flat, C, the vocal
+// hook sung by two lead guitars in harmony a third apart: up to a belted
+// high B flat, and a long high E that slides down to D. It opens on one
+// held, bent high D; there's a half-time bridge that lifts back up, and a
+// solo of long bends and runs. The sound is after the Madness Engine's
+// band (Metroll's). The two rhythm guitars, hard left and right, the
+// right a hair late, are a wall: power chords of detuned saws, the mids
+// pushed into a hard clipper, the lows put back, the middle scooped, the
+// fizz rolled off; palm-muted they thud, darkened before the amp. The
 // bass drives eighths and steps into each change, a sine under it. The
 // drums are a metal kit (a kick with the beater's click on it, a cracking
-// snare, toms and a china): the gallop in the verses, a skank beat
-// building into the choruses, double bass under them, a half-time
-// breakdown, a fill into every change. A dark string pad hangs over the
-// choruses like the storm. The song goes round for ever, like the road.
-// Under it there's the truck: the diesel, changing gear as you speed up,
-// the blade scraping the road, the blizzard howling round the cab, and the
-// wipers.
+// snare, toms and a china), driving eighths on the kick in the choruses,
+// double bass under the solo, a fill into every change. A dark string
+// pad hangs over the choruses like the storm. The song goes round for
+// ever, like the road. Under it there's the truck: the diesel, changing
+// gear as you speed up, the blade scraping the road, the blizzard howling
+// round the cab, and the wipers.
 const store = {
   get(k) { try { return localStorage.getItem(k); } catch { return null; } },
   set(k, v) { try { localStorage.setItem(k, v); } catch { /* storage unavailable */ } },
 };
 
 const LEVEL = 0.7;
-const BPM = 160;
+const BPM = 185;
 const S16 = 60 / BPM / 4;  // a sixteenth, in seconds
-const AHEAD = 0.25;        // schedule the band this far ahead
+// The band is scheduled this far ahead of the audio clock, on its own
+// timer, so a slow frame (or a few) can't make it stumble.
+const AHEAD = 1;
 
 // ---- the song ---------------------------------------------------------------
 const SEMI = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
@@ -36,8 +39,8 @@ const midi = n => {
 };
 const hz = m => 440 * Math.pow(2, (m - 69) / 12);
 
-// E minor, for harmonising the leads a third up.
-const SCALE = [4, 6, 7, 9, 11, 0, 2];
+// D minor, for harmonising the leads a third up.
+const SCALE = [2, 4, 5, 7, 9, 10, 0];
 const third = m => {
   const i = SCALE.indexOf(((m % 12) + 12) % 12);
   if (i < 0) return m + 3;
@@ -49,11 +52,13 @@ const third = m => {
 // they hit; `hat`, `ride` the cymbal ticking time; `lean` plays each hit
 // with fewer layers, for the fast ones.
 const DRUMS = {
-  // The gallop: the kick doubling the guitars' da-da-dum, the snare on two and four.
-  gallop: { kick: [0, 2, 3, 8, 10, 11], snare: [4, 12], hat: [0, 2, 4, 6, 8, 10, 12, 14] },
-  // The skank beat, the snare on every off-beat, flat out.
+  // A rock beat: the kick on one and three and pushed, the snare on two and four, hats on the eighths.
+  rock: { kick: [0, 8, 10], snare: [4, 12], hat: [0, 2, 4, 6, 8, 10, 12, 14] },
+  // Driving: the kick on every eighth under the backbeat, the ride on the quarters.
+  drive: { kick: [0, 2, 4, 6, 8, 10, 12, 14], snare: [4, 12], ride: [0, 4, 8, 12], lean: true },
+  // The skank beat, the snare on every off-beat, flat out, building.
   skank: { kick: [0, 3, 4, 8, 11, 12], snare: [2, 6, 10, 14], hat: [0, 4, 8, 12], lean: true },
-  // Double bass under the snare's backbeat, the ride on the quarters.
+  // Double bass under the snare's backbeat.
   double: { kick: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15], snare: [4, 12], ride: [0, 4, 8, 12], lean: true },
   // Half time: the kick dropping like an anvil, the snare on three.
   half: { kick: [0, 3, 10], snare: [8], ride: [0, 4, 8, 12] },
@@ -61,67 +66,82 @@ const DRUMS = {
 // How the rhythm guitars play: 0 rest, 1 a palm-muted chug, 2 a chord let ring.
 const STRUMS = {
   ring: [2, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0],
-  gallop: [2, 0, 1, 1, 1, 0, 1, 1, 2, 0, 1, 1, 1, 0, 1, 1],
+  eighths: [2, 0, 1, 0, 1, 0, 1, 0, 2, 0, 1, 0, 1, 0, 1, 0],
   palm: [2, 1, 1, 1, 2, 1, 1, 1, 2, 1, 1, 1, 2, 1, 1, 1],
   open: [2, 0, 2, 0, 2, 0, 2, 0, 2, 0, 2, 0, 2, 0, 2, 0],
-  breakdown: [2, 0, 0, 1, 1, 0, 2, 0, 0, 1, 0, 1, 2, 0, 1, 1],
 };
 
-// Each bar names its chord by its root (two roots split the bar). Lead
-// lines are eighths, or sixteenths if a bar has sixteen of them: a note
-// picks once; ^ bends up into it from a whole step below; ! dives off the
-// whammy bar; - holds the note before; . is a rest. `twin` doubles the
-// lead a third up, on the other side.
+// Each bar names its chord by its root, low in drop D (two roots split
+// the bar). Lead lines are eighths, or sixteenths if a bar has sixteen of
+// them: a note picks once; ^ bends up into it from a whole step below; _
+// slides into it from the note before; - holds the note before; . is a
+// rest. `twin` doubles the lead a third up, on the other side.
 const SECTIONS = {
   intro: {
-    drums: 'swell', strum: 'ring', bass: 'hold', twin: true,
-    chords: ['E2', 'C3', 'D3', 'E2'],
-    lead: ['B4 - E5 - G5 - F#5 E5', 'G5 - - - E5 - C5 -', 'D5 - F#5 - A5 - G5 F#5', 'E5 - - - - - . .'],
+    drums: 'swell', strum: 'ring', bass: 'hold',
+    chords: ['D2', 'D2', 'A#2/C3', 'D2'],
+    lead: ['D6^ - - - - - - -', 'D6 - - - C6 - A5 -', 'A#5 - - - C6 - - -', 'D6 - - - - - . .'],
+  },
+  riff: {
+    drums: 'rock', strum: 'open', bass: 'eighths', twin: true,
+    chords: ['D2', 'D2', 'A#2/C3', 'D2'],
+    lead: ['A4 - D5 - E5 - F5 -', 'E5 - D5 - C5 - A4 -', 'A#4 - - - C5 - - -', 'D5 - - - - - . .'],
   },
   verse: {
-    drums: 'gallop', strum: 'gallop', bass: 'gallop',
-    chords: ['E2', 'E2', 'C3/D3', 'E2', 'E2', 'E2', 'C3/D3', 'B2'],
+    drums: 'rock', strum: 'eighths', bass: 'eighths',
+    chords: ['D2', 'D2', 'A#2', 'A#2', 'A2', 'A2', 'D2', 'C3', 'D2', 'D2', 'A#2', 'A#2', 'A2', 'A2', 'C3', 'C3'],
     lead: [
-      '. . . . . . . .', '. . . . . . . .', '. . . . . . . .', '. . . . B4 A4 G4 F#4',
-      '. . . . . . . .', '. . . . . . . .', '. . . . . . . .', 'D#5^ - - - B4 - . .',
+      '. . . . . . . .', '. . . . . . . .', '. . . . . . . .', '. . . . . . . .',
+      '. . . . . . . .', '. . . . . . . .', '. . . . . . . .', '. . . . A4 C5 D5 -',
+      '. . . . . . . .', '. . . . . . . .', '. . . . . . . .', '. . . . . . . .',
+      '. . . . . . . .', '. . . . . . . .', '. . . . . . . .', '. . . . E5 F5 E5 D5',
     ],
   },
   pre: {
     drums: 'skank', strum: 'palm', bass: 'eighths', twin: true, build: true,
-    chords: ['C3', 'D3', 'C3', 'D3'],
-    lead: ['E5^ - - - - - - -', 'F#5^ - - - - - - -', 'G5^ - - - - - - -', 'A5^ - - - B5 - . .'],
+    chords: ['A#2', 'C3', 'A#2', 'A2'],
+    lead: ['F5^ - - - - - - -', 'G5^ - - - - - - -', 'A5^ - - - - - - -', 'C#6 - - - A5 - . .'],
   },
   chorus: {
-    drums: 'double', strum: 'open', bass: 'eighths', twin: true, pad: true,
-    chords: ['E2', 'C3', 'G2', 'D3', 'E2', 'C3', 'D3', 'B2'],
+    drums: 'drive', strum: 'open', bass: 'eighths', twin: true, pad: true,
+    chords: ['D2', 'D2', 'A#2', 'A#2', 'C3', 'C3', 'D2', 'D2', 'D2', 'D2', 'A#2', 'A#2', 'C3', 'C3', 'D2', 'D2'],
     lead: [
-      'B4 - - - E5 - - -', 'G5 - - - F#5 - E5 -', 'D5 - - - B4 - - -', 'A4^ - - - - - . .',
-      'B4 - - - E5 - - -', 'G5 - - - A5 - B5 -', 'A5^ - - - G5 - F#5 -', 'F#5 - - - D#5 - - -',
+      'A4 - D5 - E5 - F5 -', 'E5 - - - D5 - C5 -', 'D5 - - - F5 - - -', 'A#5^ - - - - - - -',
+      'G5 - - - F5 - E5 -', 'E5 F5 F5 F5 E5 - - -', 'D5 - - - - - . .', '. . . . A4 C5 D5 -',
+      'A4 - D5 - E5 - F5 -', 'E5 - - - D5 - C5 -', 'D5 - - - F5 - - -', 'A#5^ - - - A5 - G5 -',
+      'E5 F5 F5 F5 E5 - - -', 'E5 - - - - - - -', 'D4_ - - - - - - -', '. . . . . . . .',
     ],
   },
-  breakdown: {
-    drums: 'half', strum: 'breakdown', bass: 'hold',
-    chords: ['E2', 'E2', 'E2', 'F2'],
-    lead: ['. . . . . . . .', '. . . . . . . .', '. . . . . . . .', '. . . . E5! - - -'],
+  bridge: {
+    drums: 'half', strum: 'ring', bass: 'hold', pad: true,
+    chords: ['A#2', 'C3', 'D2', 'D2', 'A#2', 'C3', 'A2', 'A2'],
+    lead: ['F5 - - - - - - -', 'G5 - - - E5 - - -', 'D5 - - - - - - -', '. . . . . . . .',
+      'F5 - - - - - - -', 'G5 - - - A5 - - -', 'E5^ - - - - - - -', '. . . . . . . .'],
+  },
+  lift: {
+    drums: 'rock', strum: 'eighths', bass: 'eighths', twin: true, build: true,
+    chords: ['A#2', 'C3', 'D2', 'D2', 'F2', 'G2', 'A2', 'A2'],
+    lead: ['A5 - - - - - - -', 'C6 - - - A#5 - - -', 'A5 - - - - - - -', '. . . . . . . .',
+      'A#5 - - - A5 - - -', 'A#5 - - - C6 - - -', 'C#6^ - - - - - - -', 'E6 - - - - - . .'],
   },
   solo: {
-    drums: 'double', strum: 'gallop', bass: 'eighths', build: true,
-    chords: ['E2', 'D3', 'C3', 'D3', 'E2', 'D3', 'C3', 'B2'],
+    drums: 'double', strum: 'eighths', bass: 'eighths', build: true,
+    chords: ['D2', 'A#2', 'C3', 'D2', 'D2', 'A#2', 'C3', 'A2'],
     lead: [
-      'B4 - D5 E5 G5^ - - -',
-      'F#5 E5 D5 E5 F#5 E5 D5 B4 A4 B4 D5 B4 A4 F#4 E4 D4',
-      'E4 G4 A4 B4 C5^ - - -',
-      'D5 E5 F#5 A5 D5 E5 F#5 A5 D5 E5 F#5 A5 B5 A5 F#5 D5',
-      'E5^ - - - - - G5 E5',
-      'D5 F#5 A5 D6 A5 F#5 D5 A4 D5 F#5 A5 D6 E6 D6 A5 F#5',
-      'E5 G5 C6 E6 C6 G5 E5 C5 E5 G5 C6 E6 G6 E6 C6 G5',
-      'F#6^ - - - D#6 - B5 -',
+      'D6^ - - - - - - -',
+      'D6 - C6 - A#5 - A5 -',
+      'C6^ - - - - - - -',
+      'A5 - G5 - F5 - E5 -',
+      'D5 F5 A5 D6 A5 F5 D5 F5 A5 D6 F6 D6 A5 F5 D5 A4',
+      'A#4 D5 F5 A#5 F5 D5 A#4 D5 F5 A#5 D6 A#5 F5 D5 A#4 F4',
+      'C5 E5 G5 C6 G5 E5 C5 E5 G5 C6 E6 C6 G5 E5 C5 G4',
+      'A4 C#5 E5 A5 E5 C#5 A4 C#5 E5 A5 C#6 E6 A6^ - - -',
     ],
   },
 };
-// Round and round: after the last section it goes back to the first verse.
-const ORDER = ['intro', 'verse', 'pre', 'chorus', 'verse', 'pre', 'chorus', 'breakdown', 'solo', 'chorus'];
-const LOOP_TO = 1;
+// Round and round: after the last chorus it goes back to the first verse.
+const ORDER = ['intro', 'riff', 'verse', 'pre', 'chorus', 'riff', 'verse', 'pre', 'chorus', 'bridge', 'lift', 'solo', 'chorus'];
+const LOOP_TO = 2;
 
 // A line as notes at (and lasting) so many sixteenths.
 function parseLine(line) {
@@ -132,8 +152,8 @@ function parseLine(line) {
     const last = out[out.length - 1];
     if (tok === '-') { if (last && last.end === i) { last.len += step; last.end++; } return; }
     if (tok === '.') return;
-    const mark = /[\^!]$/.exec(tok)?.[0];
-    out.push({ at: i * step, len: step, end: i + 1, m: midi(mark ? tok.slice(0, -1) : tok), bend: mark === '^', dive: mark === '!' });
+    const mark = /[\^!_]$/.exec(tok)?.[0];
+    out.push({ at: i * step, len: step, end: i + 1, m: midi(mark ? tok.slice(0, -1) : tok), bend: mark === '^', dive: mark === '!', slide: mark === '_' });
   });
   return out;
 }
@@ -143,7 +163,7 @@ const SONG = ORDER.flatMap((name, k) => {
   return sec.chords.map((c, i) => ({
     ...sec, name, roots: c.split('/').map(midi), lead: parseLine(sec.lead[i]),
     first: i === 0, last: i === sec.chords.length - 1, bar: i,
-    fill: (i % 4 === 3 || i === sec.chords.length - 1) && sec.drums !== 'swell' && !(sec.build && i === sec.chords.length - 1),
+    fill: (i % 8 === 7 || i === sec.chords.length - 1) && sec.drums !== 'swell' && !(sec.build && i === sec.chords.length - 1),
     build: !!sec.build && i === sec.chords.length - 1, start: k === LOOP_TO && i === 0,
   }));
 });
@@ -215,6 +235,7 @@ export const Sound = {
     this.noise = buf;
 
     this.initBand(comp);
+    setInterval(() => this.schedule(), 100);
     this.initTruck();
   },
 
@@ -267,7 +288,7 @@ export const Sound = {
     glue.threshold.value = -16; glue.knee.value = 12; glue.ratio.value = 4; glue.attack.value = 0.006; glue.release.value = 0.18;
     const limiter = ac.createDynamicsCompressor();
     limiter.threshold.value = -4; limiter.knee.value = 0; limiter.ratio.value = 20; limiter.attack.value = 0.001; limiter.release.value = 0.08;
-    chain(sum, filter(ac, 'highpass', 38, 0.7), filter(ac, 'lowshelf', 150, 0.7, -4), filter(ac, 'highshelf', 6000, 0.7, -3), filter(ac, 'lowpass', 11000, 0.5), glue, limiter, this.music, dest);
+    chain(sum, filter(ac, 'highpass', 55, 0.7), filter(ac, 'highpass', 55, 0.7), filter(ac, 'peaking', 75, 1, -6), filter(ac, 'peaking', 260, 0.9, -4), filter(ac, 'highshelf', 1200, 0.7, 8), filter(ac, 'highshelf', 4500, 0.7, 6), filter(ac, 'lowpass', 16000, 0.5), glue, limiter, this.music, dest);
     const room = ac.createConvolver(); room.buffer = impulse(ac, 0.9, 3);
     chain(sum, room, gainNode(ac, 0.16), glue);
 
@@ -286,8 +307,8 @@ export const Sound = {
       if (late) { const d = ac.createDelay(0.05); d.delayTime.value = late; head = input.connect(d); }
       const shape = ac.createWaveShaper(); shape.curve = curve; shape.oversample = '4x';
       chain(head, filter(ac, 'highpass', 110), filter(ac, 'peaking', 760 + late * 20000, 0.7, 7), gainNode(ac, 7), shape,
-        filter(ac, 'lowshelf', 140, 0.7, 5), filter(ac, 'peaking', 480, 0.9, -6), filter(ac, 'peaking', 2400, 1, 4),
-        filter(ac, 'lowpass', 4600 - late * 30000, 0.8), panner(ac, pan), gainNode(ac, 0.4), sum);
+        filter(ac, 'lowshelf', 140, 0.7, 5), filter(ac, 'peaking', 480, 0.9, -6), filter(ac, 'peaking', 2400, 1, 6),
+        filter(ac, 'lowpass', 6500 - late * 30000, 0.7), panner(ac, pan), gainNode(ac, 0.4), sum);
       return { input, muted };
     };
     // The leads, one each side of the middle: a milder drive, a filter, and
@@ -296,8 +317,8 @@ export const Sound = {
     const leadRig = pan => {
       const input = gainNode(ac, 1);
       const shape = ac.createWaveShaper(); shape.curve = curveLead; shape.oversample = '2x';
-      const lp = filter(ac, 'lowpass', 3400);
-      const out = chain(input, gainNode(ac, 3), shape, lp, panner(ac, pan), gainNode(ac, 0.22));
+      const lp = filter(ac, 'lowpass', 5000);
+      const out = chain(input, gainNode(ac, 3), shape, lp, panner(ac, pan), gainNode(ac, 0.3));
       out.connect(sum);
       const echo = ac.createDelay(1); echo.delayTime.value = S16 * 3;
       const fb = gainNode(ac, 0.28);
@@ -309,7 +330,8 @@ export const Sound = {
     const drums = gainNode(ac, 1);
     drums.connect(sum);
     this.bus = { sum, drums, rigs: [rig(-0.9, 0), rig(0.9, 0.011)], leads: [leadRig(-0.25), leadRig(0.3)], filters: new Map() };
-    this.band = { on: true, bar: 0, step: 0, next: ac.currentTime + 0.1, lead: false };
+    // `live` holds every note scheduled and not yet over, so a crash can cut the ones still to come.
+    this.band = { on: true, bar: 0, step: 0, next: ac.currentTime + 0.1, lead: false, live: new Set() };
   },
 
   // An envelope on gain g: up to peak, held, and away.
@@ -324,6 +346,7 @@ export const Sound = {
     const o = this.ac.createOscillator();
     o.type = type; o.frequency.setValueAtTime(f, when); o.detune.value = detune;
     o.connect(dest); o.start(when); o.stop(end);
+    this.track(o, when);
     return o;
   },
   // A burst of noise through one of the kit's filters, made once and shared.
@@ -336,6 +359,7 @@ export const Sound = {
     g.gain.exponentialRampToValueAtTime(0.0001, when + length);
     s.connect(g); g.connect(this.bus.filters.get(key));
     s.start(when, Math.random() * 1.5); s.stop(when + length + 0.05);
+    this.track(s, when);
   },
 
   // ---- the kit --------------------------------------------------------------
@@ -343,20 +367,20 @@ export const Sound = {
   kick(when, level = 1, lean = false) {
     const g = chain(gainNode(this.ac, 1), this.bus.drums);
     const end = this.env(g, when, 0.85 * level, 0.001, 0.025, lean ? 0.16 : 0.24);
-    this.osc('sine', 175, when, end, g).frequency.exponentialRampToValueAtTime(46, when + 0.06);
+    this.osc('sine', 180, when, end, g).frequency.exponentialRampToValueAtTime(55, when + 0.05);
     this.noiseHit(when, { freq: 3500, type: 'highpass', q: 0.7, level: (lean ? 0.2 : 0.26) * level, length: 0.01 });
   },
   snare(when, level = 1, lean = false) {
     this.noiseHit(when, { freq: 1900, q: 0.6, level: 0.7 * level, length: lean ? 0.12 : 0.2 });
-    if (!lean) this.noiseHit(when, { freq: 4500, type: 'highpass', q: 0.7, level: 0.22 * level, length: 0.15 });
+    this.noiseHit(when, { freq: 4500, type: 'highpass', q: 0.7, level: (lean ? 0.18 : 0.28) * level, length: lean ? 0.1 : 0.15 });
     const g = chain(gainNode(this.ac, 1), this.bus.drums);
     const end = this.env(g, when, 0.55 * level, 0.001, 0.012, 0.12);
     this.osc('triangle', 240, when, end, g).frequency.exponentialRampToValueAtTime(165, when + 0.08);
   },
-  hat(when, level = 1) { this.noiseHit(when, { freq: 7000, type: 'highpass', q: 0.7, level: 0.26 * level, length: 0.04 }); },
+  hat(when, level = 1) { this.noiseHit(when, { freq: 7000, type: 'highpass', q: 0.7, level: 0.55 * level, length: 0.05 }); },
   ride(when, level = 1) {
-    this.noiseHit(when, { freq: 6500, q: 1.4, level: 0.18 * level, length: 0.45 });
-    this.noiseHit(when, { freq: 5000, type: 'highpass', q: 0.6, level: 0.05 * level, length: 0.8 });
+    this.noiseHit(when, { freq: 6500, q: 1.4, level: 0.4 * level, length: 0.45 });
+    this.noiseHit(when, { freq: 5000, type: 'highpass', q: 0.6, level: 0.14 * level, length: 0.8 });
   },
   tom(when, pitch, level = 1) {
     const g = chain(gainNode(this.ac, 1), this.bus.drums);
@@ -365,8 +389,8 @@ export const Sound = {
     this.noiseHit(when, { freq: 900, level: 0.1 * level, length: 0.05 });
   },
   cymbal(when, level = 1) {
-    this.noiseHit(when, { freq: 4000, type: 'highpass', q: 0.5, level: 0.26 * level, length: 1.3 });
-    this.noiseHit(when, { freq: 7000, q: 0.8, level: 0.12 * level, length: 0.8 });
+    this.noiseHit(when, { freq: 4000, type: 'highpass', q: 0.5, level: 0.38 * level, length: 1.4 });
+    this.noiseHit(when, { freq: 7000, q: 0.8, level: 0.18 * level, length: 0.9 });
   },
   // A china: trashy, short, for the accents.
   china(when, level = 1) {
@@ -380,13 +404,13 @@ export const Sound = {
   guitar(when, root, length, open, level = 1) {
     const g = this.ac.createGain();
     for (const r of this.bus.rigs) g.connect(open ? r.input : r.muted);
-    const end = this.env(g, when, level * (open ? 1 : 1.6), 0.002, open ? Math.max(0.1, length - 0.05) : 0.035, open ? 0.3 : 0.045);
+    const end = this.env(g, when, level * (open ? 1 : 1.5), 0.002, open ? Math.max(0.1, length - 0.05) : 0.055, open ? 0.3 : 0.075);
     [root, root + 7, root + 12].forEach((n, i) => {
       this.osc('sawtooth', hz(n), when, end, g, i % 2 ? 6 : -6);
       if (i === 0) this.osc('sawtooth', hz(n), when, end, g, 11);
     });
   },
-  // The bass: a saw through a filter that closes on each note, a sine an octave under.
+  // The bass: a saw through a filter that closes on each note, a sine under it.
   bassNote(when, m, length, level = 1) {
     const ac = this.ac;
     const f = filter(ac, 'lowpass', 1400);
@@ -396,12 +420,12 @@ export const Sound = {
     f.connect(g);
     const end = this.env(g, when, 1, 0.005, Math.max(0.02, length * 0.55), 0.09);
     this.osc('sawtooth', hz(m), when, end, f);
-    this.osc('sine', hz(m - 12), when, end, chain(gainNode(ac, 0.5), g));
+    this.osc('sine', hz(m), when, end, chain(gainNode(ac, 0.2), g));
   },
   // A lead note on one side: two saws a hair apart, vibrato coming in on
   // the long ones; a bend starts a whole step low and is pushed up into
   // pitch; a dive drops off the end of the whammy bar.
-  leadNote(when, m, length, { side = 0, level = 1, bend = false, dive = false } = {}) {
+  leadNote(when, m, length, { side = 0, level = 1, bend = false, dive = false, from = null } = {}) {
     const ac = this.ac;
     const g = ac.createGain();
     g.connect(this.bus.leads[side].input);
@@ -410,6 +434,7 @@ export const Sound = {
     for (const o of oscs) {
       if (bend) { o.frequency.setValueAtTime(hz(m - 2), when); o.frequency.setTargetAtTime(hz(m), when + 0.03, 0.05); }
       if (dive) { o.frequency.setValueAtTime(hz(m), when + 0.15); o.frequency.exponentialRampToValueAtTime(hz(m - 30), end - 0.05); }
+      if (from != null) { o.frequency.setValueAtTime(hz(from), when); o.frequency.exponentialRampToValueAtTime(hz(m), when + length * 0.85); }
     }
     if (length > S16 * 3 && !dive) {
       const vib = ac.createOscillator(); vib.frequency.value = 6.4;
@@ -434,7 +459,7 @@ export const Sound = {
   drums(bar, i, t) {
     const D = DRUMS[bar.drums];
     if (bar.drums === 'swell') {
-      // The intro: the chord left to ring, toms rolling in, a snare roll into the verse.
+      // The intro: the chord left to ring, toms rolling in, a snare roll into the riff.
       if (bar.bar === 0 && i === 0) this.cymbal(t);
       if (bar.bar === 2 && i % 2 === 0) this.tom(t, i < 8 ? 82 : 110, 0.4 + 0.04 * i);
       if (bar.last) this.snare(t, 0.3 + 0.045 * i, true);
@@ -489,9 +514,11 @@ export const Sound = {
     for (const e of bar.lead) {
       if (Math.floor(e.at) !== i) continue;
       const at = t + (e.at - i) * S16, dur = e.len * S16 * 0.95;
+      const from = e.slide ? this.band.lastLead : null;
       const o = { level: e.len < 2 ? 0.85 : 1, bend: e.bend, dive: e.dive };
-      this.leadNote(at, e.m, dur, { ...o, side: 0 });
-      if (bar.twin) this.leadNote(at + 0.006, third(e.m), dur, { ...o, side: 1, level: o.level * 0.8 });
+      this.leadNote(at, e.m, dur, { ...o, side: 0, from });
+      if (bar.twin) this.leadNote(at + 0.006, third(e.m), dur, { ...o, side: 1, level: o.level * 0.8, from: from == null ? null : third(from) });
+      this.band.lastLead = e.m;
     }
   },
 
@@ -540,21 +567,48 @@ export const Sound = {
     o.start(t); o.stop(t + dur + 0.02);
   },
 
-  // Every frame: the band plays on, the diesel works with your speed, the
-  // blade scrapes with the snow on it.
+  // A note's source, kept until it ends.
+  track(node, when) {
+    node.at = when;
+    this.band.live.add(node);
+    node.onended = () => this.band.live.delete(node);
+  },
+  // Every note that hasn't started yet, cut before it does.
+  cut(t) {
+    for (const n of this.band.live) {
+      if (n.at < t) continue;
+      try { n.stop(t); } catch { /* already stopped */ }
+      this.band.live.delete(n);
+    }
+  },
+
+  // The band, a second ahead. If it ever falls behind (the tab was away),
+  // it skips whole sixteenths, so it comes back in time, never late.
+  schedule() {
+    if (!this.ac || this.ac.state !== 'running') return;
+    const b = this.band, t = this.ac.currentTime;
+    if (!b.on) return;
+    while (b.next < t + 0.02) this.advance();
+    while (b.next < t + AHEAD) {
+      this.playStep(SONG[b.bar], b.step, b.next, SONG[this.nextBar()]);
+      this.advance();
+    }
+  },
+  nextBar() { return this.band.bar + 1 < SONG.length ? this.band.bar + 1 : LOOP_BAR; },
+  advance() {
+    const b = this.band;
+    b.next += S16;
+    if (++b.step === 16) { b.step = 0; b.bar = this.nextBar(); }
+  },
+
+  // Every frame: the diesel works with your speed, the blade scrapes with
+  // the snow on it, and the band comes up while you drive.
   update(dt, speed, load, mode) {
     if (!this.ac || this.ac.state !== 'running') return;
     const t = this.ac.currentTime;
     const b = this.band;
     b.lead = mode === 'run';
     this.music.gain.setTargetAtTime(b.on ? (mode === 'run' ? 0.6 : 0.3) : 0, t, b.on ? 0.3 : 0.8);
-    if (b.next < t) b.next = t + 0.02;
-    while (b.on && b.next < t + AHEAD) {
-      const nextBar = b.bar + 1 < SONG.length ? b.bar + 1 : LOOP_BAR;
-      this.playStep(SONG[b.bar], b.step, b.next, SONG[nextBar]);
-      b.next += S16;
-      if (++b.step === 16) { b.step = 0; b.bar = nextBar; }
-    }
     // Up through the gears: revs climb with speed and drop at each change.
     const E = this.engine;
     const gear = Math.min(5, Math.floor(speed / 6));
@@ -576,7 +630,9 @@ export const Sound = {
   start() {
     if (!this.ac) return;
     const b = this.band, t = this.ac.currentTime + 0.05;
+    this.cut(t);
     b.on = true; b.bar = 0; b.step = 0; b.next = t;
+    this.schedule();
     this.tone(60, 90, 0.8, 0.12, 'sawtooth');
   },
   // A big air horn: three reeds a little out of tune with each other.
@@ -633,8 +689,9 @@ export const Sound = {
     }
     if (kind === 'robot' || kind === 'crew' || kind === 'walker' || kind === 'leaper') this.tone(900, 120, 0.5, 0.05, 'square');
     if (!this.ac) return;
-    const b = this.band, t = Math.max(this.ac.currentTime + 0.01, b.next);
-    b.on = false;
+    const t = this.ac.currentTime + 0.01;
+    this.band.on = false;
+    this.cut(t);
     this.guitar(t, midi('E2'), 1.8, true, 1.1);
     this.cymbal(t, 1.2);
     this.china(t, 1.2);
