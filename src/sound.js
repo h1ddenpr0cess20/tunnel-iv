@@ -30,10 +30,10 @@ const S16 = 60 / BPM / 4;  // a sixteenth, in seconds
 // The band is scheduled this far ahead of the audio clock, on its own
 // timer, so a slow frame (or a few) can't make it stumble.
 const AHEAD = 1;
-// On a TV stick the synth is trimmed so the audio thread keeps up: a bigger
+// In lite mode (`?lite`, for weak devices) the synth is trimmed so the audio thread keeps up: a bigger
 // buffer, one guitar amp and one lead instead of two, no pad, no oversampling
 // on the amps and no room reverb.
-const LITE = location.search.includes('tv') || /FireTVApp|AFT/.test(navigator.userAgent);
+const LITE = new URLSearchParams(location.search).has('lite');
 
 // ---- the song ---------------------------------------------------------------
 const SEMI = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
