@@ -224,6 +224,19 @@ export function createGame(events) {
       parts.push({ mesh: MESH.BOXS, mat: MAT.TRACTOR, off: [0, 0.82, tz], scl: [0.7, 0.25, 0.14] });
       for (const tx of [-0.95, 0.95]) parts.push({ mesh: MESH.TIRE, off: [tx, 0.54, tz], scl: [1.45, 1.45, 1.45] });
     }
+    // The cab sits at an angle: its frame rail, axles and tires turn with it.
+    const cabYaw = side * 0.9, cs = Math.cos(cabYaw), sn = Math.sin(cabYaw), cabAt = [-side * 0.8, 9.1];
+    const inCab = (lx, lz) => [cabAt[0] + lx * cs + lz * sn, cabAt[1] - lx * sn + lz * cs];
+    const cabRot = qAxis(Y_AXIS, cabYaw);
+    parts.push({ mesh: MESH.BOXS, mat: MAT.TRACTOR, off: [cabAt[0], 1.05, cabAt[1]], scl: [0.9, 0.12, 1.4], rot: cabRot });
+    for (const lz of [-0.8, 0.85]) {
+      const [ax, az] = inCab(0, lz);
+      parts.push({ mesh: MESH.AXLE, off: [ax, 0.54, az], scl: [0.95, 1.6, 1.6], rot: cabRot });
+      for (const lx of [-0.95, 0.95]) {
+        const [tx, tz] = inCab(lx, lz);
+        parts.push({ mesh: MESH.TIRE, off: [tx, 0.54, tz], scl: [1.45, 1.45, 1.45], rot: cabRot });
+      }
+    }
     const a = -len / 2 + 1.3, b = len / 2 - 1.3;
     return thing('jackknife', z + dz / 2, {
       x: (xi + xo) / 2, yaw, snow: 0.8, reach: 9, parts, lamps,
