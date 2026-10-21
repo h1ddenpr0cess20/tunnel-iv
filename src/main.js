@@ -18,7 +18,7 @@ if (tv) {
     el.textContent = el.textContent.replace(/press space/i, 'Press Select').replace('Press P ', 'Press Play/Pause ');
   }
 }
-let particles = Number(params.get('particles')) || (tv ? 6000 : coarse ? 30000 : 70000);
+let particles = Number(params.get('particles')) || (tv ? 10000 : coarse ? 30000 : 70000);
 
 const hud = createHud(store);
 hud.sound(Sound.muted);
@@ -71,7 +71,7 @@ window.addEventListener('blur', () => game.setPaused(true));
 
 // A TV stick's GPU can't shade a full 1080p frame of this, so draw it at a
 // fixed lower height and let the browser scale it up; slow frames lower it.
-let tvHeight = Number(params.get('height')) || 360;
+let tvHeight = Number(params.get('height')) || 540;
 function resize(canvas) {
   let dpr = Math.min(coarse ? 1.5 : 2, window.devicePixelRatio || 1);
   if (tv) dpr = Math.min(dpr, tvHeight / Math.max(1, canvas.clientHeight));
@@ -120,7 +120,7 @@ async function boot() {
       if (dt > (interval ? 1.4 * interval / 1000 : 1 / 40)) slow++;
       if (frames >= 90) {
         if (slow > 45) {
-          if (tv && tvHeight > 270 && !params.get('height')) tvHeight = Math.max(270, Math.round(tvHeight * 0.85));
+          if (tv && tvHeight > 360 && !params.get('height')) tvHeight = Math.max(360, Math.round(tvHeight * 0.85));
           else if (particles > (tv ? 3000 : 20000)) particles = Math.round(particles * 0.75);
         }
         frames = 0; slow = 0;
