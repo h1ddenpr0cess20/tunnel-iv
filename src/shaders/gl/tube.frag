@@ -20,6 +20,14 @@ in vec3 vN;
 in vec3 vLoc;
 out vec4 outColor;
 
+#ifdef LITE
+#define STORM_IT 2
+#define FBM_OCT 2
+#else
+#define STORM_IT 5
+#define FBM_OCT 3
+#endif
+
 const float TAU = 6.2831853;
 const float ROAD_W = 6.6;
 
@@ -56,19 +64,19 @@ float fbm(vec3 p, float per) {
   float amp = 0.5;
   vec3 q = p;
   float pr = per;
-  for (int i = 0; i < 3; i++) {
+  for (int i = 0; i < FBM_OCT; i++) {
     v += amp * noise(q, pr);
     q = q * 2.0 + vec3(1.7, 9.2, 0.0);
     pr *= 2.0;
     amp *= 0.5;
   }
-  return v / 0.875;
+  return v / (FBM_OCT == 3 ? 0.875 : 0.75);
 }
 
 float storm(float a, float zw, float flow, float aa) {
   float x = a * 3.0;
   float y = zw * 0.0625;
-  for (int i = 0; i < 5; i++) {
+  for (int i = 0; i < STORM_IT; i++) {
     float fi = float(i);
     float nx = noise(vec3(x * 0.625 + 3.1 * fi, flow + 1.7 * fi, y * 0.625), 80.0) - 0.5;
     float ny = noise(vec3(x * 0.625 + 8.3 * fi + 5.0, flow + 4.2 * fi, y * 0.625), 80.0) - 0.5;
@@ -114,6 +122,21 @@ void main() {
   float ground = bank(xr, z);
   float up = smoothstep(ground + 0.2, ground + 1.6, yr);
 
+#ifdef LITE
+  float g = 0.74 + 0.1 * noise(vec3(xr * 0.6, 0.5, zw * 0.25), 512.0);
+  float rut = 0.0;
+  for (int i = -1; i < 2; i++) {
+    float e = abs(abs(xr - float(i) * 3.6) - 0.9);
+    rut += 1.0 - smoothstep(0.16, 0.3, e);
+  }
+  rut = clamp(rut, 0.0, 1.0) * (1.0 - smoothstep(ROAD_W - 1.0, ROAD_W, abs(xr)));
+  g = mix(g, 0.6, rut * 0.7);
+  float dash = step(fract(ph(8, z) / TAU), 0.25);
+  float paint = (1.0 - smoothstep(0.06, 0.1, abs(abs(xr) - 1.8))) * dash + (1.0 - smoothstep(0.07, 0.11, abs(abs(xr) - (ROAD_W - 0.5))));
+  g = mix(g, 0.95, paint * 0.2);
+  float heap = smoothstep(ROAD_W - 0.2, ROAD_W + 0.8, abs(xr));
+  g = mix(g, 0.9, heap);
+#else
   float g = 0.74 + 0.1 * noise(vec3(xr * 0.6, 0.5, zw * 0.25), 512.0) + 0.05 * noise(vec3(xr * 6.0, 1.5, zw * 3.0), 6144.0);
   float rut = 0.0;
   float wob = noise(vec3(xr * 4.0, 2.0, zw), 2048.0) - 0.5;
@@ -134,6 +157,8 @@ void main() {
   float heap = smoothstep(ROAD_W - 0.2, ROAD_W + 0.8, abs(xr));
   g = mix(g, 0.86 + 0.12 * noise(vec3(xr * 1.5, yr * 2.0, zw * 0.75), 1536.0), heap);
 
+#endif
+
   float sky = 0.62 + 0.3 * n.y;
   float hl = headlights(vW, n);
   vec3 col = vec3(g) * (sky + hl * 1.4 + u.g.w * 0.05 * exp(-dist * 0.1));
@@ -144,7 +169,11 @@ void main() {
   col = mix(col, u.c.rgb, fog);
 
   if (up > 0.001) {
+#ifdef LITE
+    float stream = noise(vec3(cos(a) * 3.0 - t * 0.3, sin(a) * 3.0, zw * 0.25), 512.0);
+#else
     float stream = fbm(vec3(cos(a) * 3.0 - t * 0.3, sin(a) * 3.0, zw * 0.25), 512.0);
+#endif
     float w = mix(0.8 + 0.18 * stream, u.c.r, fog);
     float high = smoothstep(ground + 0.8, ground + 3.0, yr);
     if (high > 0.001) {

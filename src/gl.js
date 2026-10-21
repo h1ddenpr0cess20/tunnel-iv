@@ -17,10 +17,16 @@ export function createWebGL(canvas, meshes) {
   if (!gl) throw new Error('This browser supports neither WebGPU nor WebGL 2.');
   const floatTarget = gl.getExtension('EXT_color_buffer_float') || gl.getExtension('EXT_color_buffer_half_float');
 
+  // In lite mode (the TV default) the heaviest shader work (fine noise on the road, the
+  // storm's detail, frost and droplets on the glass) is compiled out.
+  const q = new URLSearchParams(location.search);
+  const tv = q.has('tv') || /FireTVApp|AFT/.test(navigator.userAgent);
+  const lite = q.has('lite') || (tv && !q.has('full'));
+
   function program(name, vs, fs, blocks) {
     const compile = (type, src, label) => {
       const s = gl.createShader(type);
-      gl.shaderSource(s, src);
+      gl.shaderSource(s, lite ? src.replace('#version 300 es\n', '#version 300 es\n#define LITE\n') : src);
       gl.compileShader(s);
       if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(`${label}: ${gl.getShaderInfoLog(s)}`);
       return s;

@@ -30,6 +30,11 @@ const S16 = 60 / BPM / 4;  // a sixteenth, in seconds
 // The band is scheduled this far ahead of the audio clock, on its own
 // timer, so a slow frame (or a few) can't make it stumble.
 const AHEAD = 1;
+// In lite mode (the TV default) the synth is trimmed so the audio thread keeps up: a bigger
+// buffer, one guitar amp and one lead instead of two, no pad, no oversampling
+// on the amps and no room reverb.
+const Q = new URLSearchParams(location.search);
+const LITE = Q.has('lite') || ((Q.has('tv') || /FireTVApp|AFT/.test(navigator.userAgent)) && !Q.has('full'));
 
 // ---- the song ---------------------------------------------------------------
 const SEMI = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
@@ -217,7 +222,11 @@ export const Sound = {
     if (this.ac) { if (this.ac.state === 'suspended') this.ac.resume(); return; }
     const AC = window.AudioContext || window.webkitAudioContext;
     if (!AC) return;
-    try { this.ac = new AC(); } catch { return; }
+    try {
+      // Half the sample rate is half the work for the audio thread.
+      try { this.ac = new AC(LITE ? { latencyHint: 'playback', sampleRate: 22050 } : undefined); }
+      catch { this.ac = new AC(); }
+    } catch { return; }
     const ac = this.ac;
     this.out = ac.createGain();
     this.out.gain.value = this.muted ? 0 : LEVEL;
@@ -236,6 +245,9 @@ export const Sound = {
 
     this.initBand(comp);
     setInterval(() => this.schedule(), 100);
+    // A starved audio thread can leave the context suspended or interrupted:
+    // bring it back unless the game itself is paused.
+    setInterval(() => { if (!this.held && this.ac.state !== 'running') this.ac.resume().catch(() => {}); }, 1000);
     this.initTruck();
   },
 
@@ -289,8 +301,10 @@ export const Sound = {
     const limiter = ac.createDynamicsCompressor();
     limiter.threshold.value = -4; limiter.knee.value = 0; limiter.ratio.value = 20; limiter.attack.value = 0.001; limiter.release.value = 0.08;
     chain(sum, filter(ac, 'highpass', 55, 0.7), filter(ac, 'highpass', 55, 0.7), filter(ac, 'peaking', 75, 1, -6), filter(ac, 'peaking', 260, 0.9, -4), filter(ac, 'highshelf', 1200, 0.7, 8), filter(ac, 'highshelf', 4500, 0.7, 6), filter(ac, 'lowpass', 16000, 0.5), glue, limiter, this.music, dest);
-    const room = ac.createConvolver(); room.buffer = impulse(ac, 0.9, 3);
-    chain(sum, room, gainNode(ac, 0.16), glue);
+    if (!LITE) {
+      const room = ac.createConvolver(); room.buffer = impulse(ac, 0.9, 3);
+      chain(sum, room, gainNode(ac, 0.16), glue);
+    }
 
     // The rhythm rigs, one hard left and one hard right, the right 11 ms
     // late and voiced a little differently, so the two play as a wall: the
@@ -305,7 +319,7 @@ export const Sound = {
       muted.connect(input);
       let head = input;
       if (late) { const d = ac.createDelay(0.05); d.delayTime.value = late; head = input.connect(d); }
-      const shape = ac.createWaveShaper(); shape.curve = curve; shape.oversample = '4x';
+      const shape = ac.createWaveShaper(); shape.curve = curve; shape.oversample = LITE ? 'none' : '4x';
       chain(head, filter(ac, 'highpass', 110), filter(ac, 'peaking', 760 + late * 20000, 0.7, 7), gainNode(ac, 7), shape,
         filter(ac, 'lowshelf', 140, 0.7, 5), filter(ac, 'peaking', 480, 0.9, -6), filter(ac, 'peaking', 2400, 1, 6),
         filter(ac, 'lowpass', 6500 - late * 30000, 0.7), panner(ac, pan), gainNode(ac, 0.4), sum);
@@ -316,7 +330,7 @@ export const Sound = {
     const curveLead = distortion(60);
     const leadRig = pan => {
       const input = gainNode(ac, 1);
-      const shape = ac.createWaveShaper(); shape.curve = curveLead; shape.oversample = '2x';
+      const shape = ac.createWaveShaper(); shape.curve = curveLead; shape.oversample = LITE ? 'none' : '2x';
       const lp = filter(ac, 'lowpass', 5000);
       const out = chain(input, gainNode(ac, 3), shape, lp, panner(ac, pan), gainNode(ac, 0.3));
       out.connect(sum);
@@ -329,7 +343,7 @@ export const Sound = {
     };
     const drums = gainNode(ac, 1);
     drums.connect(sum);
-    this.bus = { sum, drums, rigs: [rig(-0.9, 0), rig(0.9, 0.011)], leads: [leadRig(-0.25), leadRig(0.3)], filters: new Map() };
+    this.bus = { sum, drums, rigs: LITE ? [rig(0, 0)] : [rig(-0.9, 0), rig(0.9, 0.011)], leads: LITE ? [leadRig(0)] : [leadRig(-0.25), leadRig(0.3)], filters: new Map() };
     // `live` holds every note scheduled and not yet over, so a crash can cut the ones still to come.
     this.band = { on: true, bar: 0, step: 0, next: ac.currentTime + 0.1, lead: false, live: new Set() };
   },
@@ -407,7 +421,7 @@ export const Sound = {
     const end = this.env(g, when, level * (open ? 1 : 1.5), 0.002, open ? Math.max(0.1, length - 0.05) : 0.055, open ? 0.3 : 0.075);
     [root, root + 7, root + 12].forEach((n, i) => {
       this.osc('sawtooth', hz(n), when, end, g, i % 2 ? 6 : -6);
-      if (i === 0) this.osc('sawtooth', hz(n), when, end, g, 11);
+      if (i === 0 && !LITE) this.osc('sawtooth', hz(n), when, end, g, 11);
     });
   },
   // The bass: a saw through a filter that closes on each note, a sine under it.
@@ -508,7 +522,7 @@ export const Sound = {
       this.guitar(t, root, hit === 2 ? S16 * ring : S16 * 0.9, hit === 2, bar.name === 'chorus' ? 1 : 0.9);
     }
     // The pad over the chorus.
-    if (bar.pad && i === 0) this.pad(t, [root + 24, third(root + 24), root + 31], S16 * 16, 1);
+    if (bar.pad && i === 0 && !LITE) this.pad(t, [root + 24, third(root + 24), root + 31], S16 * 16, 1);
     // The leads, the second a third up on the other side.
     if (!this.band.lead && bar.name !== 'intro') return;
     for (const e of bar.lead) {
@@ -517,7 +531,7 @@ export const Sound = {
       const from = e.slide ? this.band.lastLead : null;
       const o = { level: e.len < 2 ? 0.85 : 1, bend: e.bend, dive: e.dive };
       this.leadNote(at, e.m, dur, { ...o, side: 0, from });
-      if (bar.twin) this.leadNote(at + 0.006, third(e.m), dur, { ...o, side: 1, level: o.level * 0.8, from: from == null ? null : third(from) });
+      if (bar.twin && !LITE) this.leadNote(at + 0.006, third(e.m), dur, { ...o, side: 1, level: o.level * 0.8, from: from == null ? null : third(from) });
       this.band.lastLead = e.m;
     }
   },
@@ -529,7 +543,7 @@ export const Sound = {
     if (this.out) this.out.gain.setTargetAtTime(m ? 0 : LEVEL, this.ac.currentTime, 0.05);
   },
 
-  suspend(p) { if (this.ac) (p ? this.ac.suspend() : this.ac.resume()); },
+  suspend(p) { this.held = p; if (this.ac) (p ? this.ac.suspend() : this.ac.resume()); },
 
   ok() { return this.ac && !this.muted && this.ac.state === 'running'; },
 

@@ -8,7 +8,18 @@ const STEER = {
   ArrowUp: [0, 1], KeyW: [0, 1], ArrowDown: [0, -1], KeyS: [0, -1],
 };
 
+// Keys sent by a TV remote or an app can arrive without a `code`, so fall
+// back to what the key is.
+const BY_KEY = {
+  ArrowLeft: 'ArrowLeft', ArrowRight: 'ArrowRight', ArrowUp: 'ArrowUp', ArrowDown: 'ArrowDown',
+  Enter: 'Enter', Escape: 'Escape', ' ': 'Space', a: 'KeyA', d: 'KeyD', w: 'KeyW', s: 'KeyS',
+  m: 'KeyM', p: 'KeyP',
+};
+const BY_KEYCODE = { 13: 'Enter', 27: 'Escape', 32: 'Space', 37: 'ArrowLeft', 38: 'ArrowUp', 39: 'ArrowRight', 40: 'ArrowDown' };
+const codeOf = e => e.code || BY_KEY[e.key?.length === 1 ? e.key.toLowerCase() : e.key] || BY_KEYCODE[e.keyCode] || '';
+
 export function bindInput(h) {
+  const tv = location.search.includes('tv') || /FireTVApp|AFT/.test(navigator.userAgent);
   const state = { touch: window.matchMedia?.('(pointer: coarse)').matches ?? false };
   const held = new Set();
 
@@ -20,9 +31,9 @@ export function bindInput(h) {
   }
 
   window.addEventListener('keydown', e => {
-    const k = e.code;
+    const k = codeOf(e);
     if (GAME_KEYS.has(k)) e.preventDefault();
-    if (e.target?.closest?.('button') && (k === 'Space' || k === 'Enter')) return;
+    if (!tv && e.target?.closest?.('button') && (k === 'Space' || k === 'Enter')) return;
     if (STEER[k]) { held.add(k); steer(); }
     if (e.repeat) return;
     switch (k) {
@@ -32,7 +43,7 @@ export function bindInput(h) {
     }
   });
   window.addEventListener('keyup', e => {
-    if (held.delete(e.code)) steer();
+    if (held.delete(codeOf(e))) steer();
   });
   window.addEventListener('blur', () => { held.clear(); steer(); });
 
