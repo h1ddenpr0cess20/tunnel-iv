@@ -31,7 +31,8 @@ const S16 = 60 / BPM / 4;  // a sixteenth, in seconds
 // timer, so a slow frame (or a few) can't make it stumble.
 const AHEAD = 1;
 // On a TV stick the synth is trimmed so the audio thread keeps up: a bigger
-// buffer, no oversampling on the amps and no room reverb.
+// buffer, one guitar amp and one lead instead of two, no pad, no oversampling
+// on the amps and no room reverb.
 const LITE = location.search.includes('tv') || /FireTVApp|AFT/.test(navigator.userAgent);
 
 // ---- the song ---------------------------------------------------------------
@@ -341,7 +342,7 @@ export const Sound = {
     };
     const drums = gainNode(ac, 1);
     drums.connect(sum);
-    this.bus = { sum, drums, rigs: [rig(-0.9, 0), rig(0.9, 0.011)], leads: [leadRig(-0.25), leadRig(0.3)], filters: new Map() };
+    this.bus = { sum, drums, rigs: LITE ? [rig(0, 0)] : [rig(-0.9, 0), rig(0.9, 0.011)], leads: LITE ? [leadRig(0)] : [leadRig(-0.25), leadRig(0.3)], filters: new Map() };
     // `live` holds every note scheduled and not yet over, so a crash can cut the ones still to come.
     this.band = { on: true, bar: 0, step: 0, next: ac.currentTime + 0.1, lead: false, live: new Set() };
   },
@@ -419,7 +420,7 @@ export const Sound = {
     const end = this.env(g, when, level * (open ? 1 : 1.5), 0.002, open ? Math.max(0.1, length - 0.05) : 0.055, open ? 0.3 : 0.075);
     [root, root + 7, root + 12].forEach((n, i) => {
       this.osc('sawtooth', hz(n), when, end, g, i % 2 ? 6 : -6);
-      if (i === 0) this.osc('sawtooth', hz(n), when, end, g, 11);
+      if (i === 0 && !LITE) this.osc('sawtooth', hz(n), when, end, g, 11);
     });
   },
   // The bass: a saw through a filter that closes on each note, a sine under it.
@@ -520,7 +521,7 @@ export const Sound = {
       this.guitar(t, root, hit === 2 ? S16 * ring : S16 * 0.9, hit === 2, bar.name === 'chorus' ? 1 : 0.9);
     }
     // The pad over the chorus.
-    if (bar.pad && i === 0) this.pad(t, [root + 24, third(root + 24), root + 31], S16 * 16, 1);
+    if (bar.pad && i === 0 && !LITE) this.pad(t, [root + 24, third(root + 24), root + 31], S16 * 16, 1);
     // The leads, the second a third up on the other side.
     if (!this.band.lead && bar.name !== 'intro') return;
     for (const e of bar.lead) {
@@ -529,7 +530,7 @@ export const Sound = {
       const from = e.slide ? this.band.lastLead : null;
       const o = { level: e.len < 2 ? 0.85 : 1, bend: e.bend, dive: e.dive };
       this.leadNote(at, e.m, dur, { ...o, side: 0, from });
-      if (bar.twin) this.leadNote(at + 0.006, third(e.m), dur, { ...o, side: 1, level: o.level * 0.8, from: from == null ? null : third(from) });
+      if (bar.twin && !LITE) this.leadNote(at + 0.006, third(e.m), dur, { ...o, side: 1, level: o.level * 0.8, from: from == null ? null : third(from) });
       this.band.lastLead = e.m;
     }
   },
