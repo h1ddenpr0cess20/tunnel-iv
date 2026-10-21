@@ -20,7 +20,8 @@ export function createWebGL(canvas, meshes) {
   // In lite mode (`?lite`, for weak devices) the heaviest shader work (fine noise on the road, the
   // storm's detail, frost and droplets on the glass) is compiled out.
   const q = new URLSearchParams(location.search);
-  const lite = q.has('lite') && q.get('lite') !== '0';
+  const tv = q.has('tv') || /FireTVApp|AFT/.test(navigator.userAgent);
+  const lite = q.has('lite') || (tv && !q.has('full'));
 
   function program(name, vs, fs, blocks) {
     const compile = (type, src, label) => {

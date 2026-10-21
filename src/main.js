@@ -20,7 +20,7 @@ if (tv) {
     el.textContent = el.textContent.replace(/press space/i, 'Press Select').replace('Press P ', 'Press Play/Pause ');
   }
 }
-let particles = Number(params.get('particles')) || (lite ? 10000 : tv ? 50000 : coarse ? 30000 : 70000);
+let particles = Number(params.get('particles')) || (lite ? 10000 : tv ? 25000 : coarse ? 30000 : 70000);
 
 const hud = createHud(store);
 hud.sound(Sound.muted);
@@ -71,13 +71,12 @@ hud.buttons.pause.addEventListener('click', () => game.setPaused(!S.paused));
 document.addEventListener('visibilitychange', () => { if (document.hidden) game.setPaused(true); });
 window.addEventListener('blur', () => game.setPaused(true));
 
-// Lite mode draws at a fixed lower height and lets the browser scale it up;
-// slow frames lower it. A TV otherwise draws at up to 1080p.
-let tvHeight = Number(params.get('height')) || 540;
+// A TV draws at a set height (720p; lite, 540p) and lets the browser scale it
+// up; slow frames lower it.
+let tvHeight = Number(params.get('height')) || (lite ? 540 : 720);
 function resize(canvas) {
   let dpr = Math.min(coarse ? 1.5 : 2, window.devicePixelRatio || 1);
-  if (lite) dpr = Math.min(dpr, tvHeight / Math.max(1, canvas.clientHeight));
-  else if (tv) dpr = Math.min(dpr, 1080 / Math.max(1, canvas.clientHeight));
+  if (tv || lite) dpr = Math.min(dpr, tvHeight / Math.max(1, canvas.clientHeight));
   const w = Math.max(1, Math.round(canvas.clientWidth * dpr));
   const h = Math.max(1, Math.round(canvas.clientHeight * dpr));
   if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
@@ -123,8 +122,8 @@ async function boot() {
       if (dt > (interval ? 1.4 * interval / 1000 : 1 / 40)) slow++;
       if (frames >= 90) {
         if (slow > 45) {
-          if (lite && tvHeight > 360 && !params.get('height')) tvHeight = Math.max(360, Math.round(tvHeight * 0.85));
-          else if (particles > (lite ? 3000 : 20000)) particles = Math.round(particles * 0.75);
+          if ((tv || lite) && tvHeight > (lite ? 360 : 450) && !params.get('height')) tvHeight = Math.max(lite ? 360 : 450, Math.round(tvHeight * 0.85));
+          else if (particles > (lite ? 3000 : tv ? 6000 : 20000)) particles = Math.round(particles * 0.75);
         }
         frames = 0; slow = 0;
       }
