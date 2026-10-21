@@ -30,6 +30,9 @@ const S16 = 60 / BPM / 4;  // a sixteenth, in seconds
 // The band is scheduled this far ahead of the audio clock, on its own
 // timer, so a slow frame (or a few) can't make it stumble.
 const AHEAD = 1;
+// On a TV stick the synth is trimmed so the audio thread keeps up: a bigger
+// buffer, no oversampling on the amps and no room reverb.
+const LITE = location.search.includes('tv') || /FireTVApp|AFT/.test(navigator.userAgent);
 
 // ---- the song ---------------------------------------------------------------
 const SEMI = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
@@ -217,7 +220,7 @@ export const Sound = {
     if (this.ac) { if (this.ac.state === 'suspended') this.ac.resume(); return; }
     const AC = window.AudioContext || window.webkitAudioContext;
     if (!AC) return;
-    try { this.ac = new AC(); } catch { return; }
+    try { this.ac = new AC(LITE ? { latencyHint: 'playback' } : undefined); } catch { return; }
     const ac = this.ac;
     this.out = ac.createGain();
     this.out.gain.value = this.muted ? 0 : LEVEL;
@@ -289,8 +292,10 @@ export const Sound = {
     const limiter = ac.createDynamicsCompressor();
     limiter.threshold.value = -4; limiter.knee.value = 0; limiter.ratio.value = 20; limiter.attack.value = 0.001; limiter.release.value = 0.08;
     chain(sum, filter(ac, 'highpass', 55, 0.7), filter(ac, 'highpass', 55, 0.7), filter(ac, 'peaking', 75, 1, -6), filter(ac, 'peaking', 260, 0.9, -4), filter(ac, 'highshelf', 1200, 0.7, 8), filter(ac, 'highshelf', 4500, 0.7, 6), filter(ac, 'lowpass', 16000, 0.5), glue, limiter, this.music, dest);
-    const room = ac.createConvolver(); room.buffer = impulse(ac, 0.9, 3);
-    chain(sum, room, gainNode(ac, 0.16), glue);
+    if (!LITE) {
+      const room = ac.createConvolver(); room.buffer = impulse(ac, 0.9, 3);
+      chain(sum, room, gainNode(ac, 0.16), glue);
+    }
 
     // The rhythm rigs, one hard left and one hard right, the right 11 ms
     // late and voiced a little differently, so the two play as a wall: the
@@ -305,7 +310,7 @@ export const Sound = {
       muted.connect(input);
       let head = input;
       if (late) { const d = ac.createDelay(0.05); d.delayTime.value = late; head = input.connect(d); }
-      const shape = ac.createWaveShaper(); shape.curve = curve; shape.oversample = '4x';
+      const shape = ac.createWaveShaper(); shape.curve = curve; shape.oversample = LITE ? 'none' : '4x';
       chain(head, filter(ac, 'highpass', 110), filter(ac, 'peaking', 760 + late * 20000, 0.7, 7), gainNode(ac, 7), shape,
         filter(ac, 'lowshelf', 140, 0.7, 5), filter(ac, 'peaking', 480, 0.9, -6), filter(ac, 'peaking', 2400, 1, 6),
         filter(ac, 'lowpass', 6500 - late * 30000, 0.7), panner(ac, pan), gainNode(ac, 0.4), sum);
@@ -316,7 +321,7 @@ export const Sound = {
     const curveLead = distortion(60);
     const leadRig = pan => {
       const input = gainNode(ac, 1);
-      const shape = ac.createWaveShaper(); shape.curve = curveLead; shape.oversample = '2x';
+      const shape = ac.createWaveShaper(); shape.curve = curveLead; shape.oversample = LITE ? 'none' : '2x';
       const lp = filter(ac, 'lowpass', 5000);
       const out = chain(input, gainNode(ac, 3), shape, lp, panner(ac, pan), gainNode(ac, 0.3));
       out.connect(sum);
