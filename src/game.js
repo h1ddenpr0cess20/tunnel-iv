@@ -209,7 +209,10 @@ export function createGame(events) {
       { mesh: MESH.BOXS, mat: MAT.TRAILER, off: [0, 2.55, 0], scl: [1.3, 1.35, 7.2] },
       { mesh: MESH.BOXS, mat: MAT.TRACTOR, off: [-side * 0.8, 1.9, 9.1], scl: [1.25, 1.5, 1.4], rot: qAxis(Y_AXIS, side * 0.9) },
     ];
-    for (const tx of [-0.95, 0.95]) for (const tz of [-5.9, -4.7]) parts.push({ mesh: MESH.TIRE, off: [tx, 0.45, tz], scl: [1.2, 1.2, 1.2] });
+    for (const tz of [-5.9, -4.7]) {
+      parts.push({ mesh: MESH.AXLE, off: [0, 0.45, tz], scl: [0.95, 1, 1] });
+      for (const tx of [-0.95, 0.95]) parts.push({ mesh: MESH.TIRE, off: [tx, 0.45, tz], scl: [1.2, 1.2, 1.2] });
+    }
     const a = -len / 2 + 1.3, b = len / 2 - 1.3;
     return thing('jackknife', z + dz / 2, {
       x: (xi + xo) / 2, yaw, snow: 0.8, reach: 9, parts, lamps,

@@ -402,6 +402,15 @@ function car() {
       disc(tris, [sx * 0.83, 0.33, z], [sx, 0, 0], 0.19, REGION.RIM);
     }
   }
+  // The axles, between each pair of wheels.
+  for (const z of AXLES) sweep(tris, [[-0.76, 0.33, z, 0.05, 0.05], [0.76, 0.33, z, 0.05, 0.05]], { region: REGION.FRAME, side: [0, 1, 0], segs: 10, per: 1, caps: 2 });
+  return tris;
+}
+
+// A bare axle, 2 m between wheel centres along x, for a semi's tires.
+function axle() {
+  const tris = [];
+  sweep(tris, [[-1, 0, 0, 0.06, 0.06], [1, 0, 0, 0.06, 0.06]], { region: REGION.FRAME, side: [0, 1, 0], segs: 10, per: 1, caps: 2 });
   return tris;
 }
 
@@ -470,12 +479,12 @@ function mound() {
 
 export const MESH = {
   SPHERE: 0, BOX: 1, BOXS: 2, ROBOT_BENT: 3, ROBOT: 4, SHOVEL_ARMS: 5, CARRY_ARMS: 6,
-  CAR: 7, TIRE: 8, BLADE: 9, ROD: 10, ROLL: 11, MOUND: 12,
+  CAR: 7, TIRE: 8, BLADE: 9, ROD: 10, ROLL: 11, MOUND: 12, AXLE: 13,
 };
 
 export function buildMeshes(B) {
   const meshes = [sphere(), roundedBox(), roundedBox(0.04), robotBody(LEAN), robotBody(0), shovelArms(), carryArms(),
-    car(), tire(), blade(B), rod(), roll(), mound()];
+    car(), tire(), blade(B), rod(), roll(), mound(), axle()];
   const out = [];
   const ranges = [];
   for (const tris of meshes) {
