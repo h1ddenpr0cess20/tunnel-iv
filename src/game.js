@@ -135,6 +135,13 @@ export function createGame(events) {
           d.vx += ((clamp(d.tx - d.x, -1, 1) * 1.6) - d.vx) * (1 - Math.exp(-dt * 2));
           d.yaw = Math.atan2(d.vx, d.vz);
         }
+        // Stop short of whatever is stuck across its way, never through it.
+        for (const o of S.deb) {
+          const gap = o.kind === 'jackknife' ? 12 : o.kind === 'buried' && Math.abs(o.x - d.x) < 2.4 ? 5.5 : 0;
+          if (!gap || Math.abs(d.z - o.z) >= gap) continue;
+          // Behind it: hold there. Already alongside it (spawned there): move on past it.
+          if (d.z < o.z) { d.z = o.z - gap; d.vz = 0; } else d.z = o.z + gap;
+        }
         const blink = Math.floor(S.T * 1.7 + d.seed * 2) % 2 === 0;
         d.glow = d.hazard ? (blink ? 1 : 0.25) : 0.35;
       },
@@ -209,7 +216,27 @@ export function createGame(events) {
       { mesh: MESH.BOXS, mat: MAT.TRAILER, off: [0, 2.55, 0], scl: [1.3, 1.35, 7.2] },
       { mesh: MESH.BOXS, mat: MAT.TRACTOR, off: [-side * 0.8, 1.9, 9.1], scl: [1.25, 1.5, 1.4], rot: qAxis(Y_AXIS, side * 0.9) },
     ];
-    for (const tx of [-0.95, 0.95]) for (const tz of [-5.9, -4.7]) parts.push({ mesh: MESH.TIRE, off: [tx, 0.45, tz], scl: [1.2, 1.2, 1.2] });
+    // The trailer's frame rails, and under them each axle: hangers up to the
+    // rails, an axle, a tire at each end.
+    parts.push({ mesh: MESH.BOXS, mat: MAT.TRACTOR, off: [0, 1.07, 0], scl: [1.0, 0.14, 6.6] });
+    for (const tz of [-5.9, -4.7]) {
+      parts.push({ mesh: MESH.AXLE, off: [0, 0.54, tz], scl: [0.95, 1.6, 1.6] });
+      parts.push({ mesh: MESH.BOXS, mat: MAT.TRACTOR, off: [0, 0.82, tz], scl: [0.7, 0.25, 0.14] });
+      for (const tx of [-0.95, 0.95]) parts.push({ mesh: MESH.TIRE, off: [tx, 0.54, tz], scl: [1.45, 1.45, 1.45] });
+    }
+    // The cab sits at an angle: its frame rail, axles and tires turn with it.
+    const cabYaw = side * 0.9, cs = Math.cos(cabYaw), sn = Math.sin(cabYaw), cabAt = [-side * 0.8, 9.1];
+    const inCab = (lx, lz) => [cabAt[0] + lx * cs + lz * sn, cabAt[1] - lx * sn + lz * cs];
+    const cabRot = qAxis(Y_AXIS, cabYaw);
+    parts.push({ mesh: MESH.BOXS, mat: MAT.TRACTOR, off: [cabAt[0], 1.05, cabAt[1]], scl: [0.9, 0.12, 1.4], rot: cabRot });
+    for (const lz of [-0.8, 0.85]) {
+      const [ax, az] = inCab(0, lz);
+      parts.push({ mesh: MESH.AXLE, off: [ax, 0.54, az], scl: [0.95, 1.6, 1.6], rot: cabRot });
+      for (const lx of [-0.95, 0.95]) {
+        const [tx, tz] = inCab(lx, lz);
+        parts.push({ mesh: MESH.TIRE, off: [tx, 0.54, tz], scl: [1.45, 1.45, 1.45], rot: cabRot });
+      }
+    }
     const a = -len / 2 + 1.3, b = len / 2 - 1.3;
     return thing('jackknife', z + dz / 2, {
       x: (xi + xo) / 2, yaw, snow: 0.8, reach: 9, parts, lamps,
@@ -746,7 +773,7 @@ export function createGame(events) {
       }
       for (const l of d.lamps) {
         const o = qRot(qd, l.at);
-        lamps.push({ pos: [cx + d.x + o[0], cy + d.y + o[1], d.z - S.s + o[2]], k: l.tail ? d.glow || 0.4 : 0.55, marker: l.marker });
+        lamps.push({ pos: [cx + d.x + o[0], cy + d.y + o[1], d.z - S.s + o[2]], k: l.tail ? 0.7 * (d.glow || 0.4) : 0.55, marker: l.marker });
       }
     }
     return out;

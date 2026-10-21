@@ -180,11 +180,12 @@ void main() {
   } else if (mat == TAIL) {
     albedo = 0.08;
     spec = 0.5; shine = 80.0;
-    emit = 0.25 + 2.2 * vAnim.y;
+    emit = 0.15 + 1.1 * vAnim.y;
     cover = 0.0;
   } else if (mat == LENS) {
     albedo = 0.6;
     spec = 0.7; shine = 120.0;
+    emit = 1.4;   // headlamps burn steadily
     cover = 0.0;
   } else if (mat == STEEL) {
     albedo = 0.05 * (0.7 + 0.6 * noise(m * vec3(3.0, 40.0, 3.0)));

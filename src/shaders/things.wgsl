@@ -253,11 +253,12 @@ fn fs(in: VO) -> @location(0) vec4f {
   } else if (mat == TAIL) {
     albedo = 0.08;
     spec = 0.5; shine = 80.0;
-    emit = 0.25 + 2.2 * it.anim.y;
+    emit = 0.15 + 1.1 * it.anim.y;
     cover = 0.0;
   } else if (mat == LENS) {
     albedo = 0.6;
     spec = 0.7; shine = 120.0;
+    emit = 1.4;   // headlamps burn steadily
     cover = 0.0;
   } else if (mat == STEEL) {
     // Your blade: worn black steel, scraped bright along its edges.
