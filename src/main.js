@@ -12,6 +12,12 @@ const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').mat
 const coarse = window.matchMedia?.('(pointer: coarse)').matches ?? false;
 const params = new URLSearchParams(location.search);
 const tv = params.has('tv') || /FireTVApp|AFT/.test(navigator.userAgent);
+if (tv) {
+  // No space bar on a remote: Select rolls out.
+  for (const el of document.querySelectorAll('.go .kb-only')) {
+    el.textContent = el.textContent.replace(/press space/i, 'Press Select').replace('Press P ', 'Press Play/Pause ');
+  }
+}
 let particles = Number(params.get('particles')) || (tv ? 25000 : coarse ? 30000 : 70000);
 
 const hud = createHud(store);

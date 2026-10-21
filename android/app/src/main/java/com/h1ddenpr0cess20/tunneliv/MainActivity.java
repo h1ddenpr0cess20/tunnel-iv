@@ -18,7 +18,7 @@ import androidx.webkit.WebViewAssetLoader;
 // WebView. Assets are served over https from a virtual host so ES modules
 // and WebGL behave as they do on a real site. The remote's D-pad arrives in
 // the page as arrow keys and Select as Enter; Back is sent as Escape (pause)
-// instead of closing the app.
+// instead of closing the app, and a few other buttons are mapped too.
 public class MainActivity extends Activity {
     private static final String URL =
         "https://appassets.androidplatform.net/assets/www/index.html?tv=1";
@@ -66,19 +66,38 @@ public class MainActivity extends Activity {
         if (focus) hideSystemUi();
     }
 
+    // Remote and gamepad buttons the page has no key for, as the keys it does:
+    // Back/B pause (Escape), Select/A roll out and honk (Enter), Play/Pause
+    // pauses (P), Menu toggles sound (M). The D-pad needs no mapping: it
+    // reaches the page as arrow keys.
+    private static int mapKey(int code) {
+        switch (code) {
+            case KeyEvent.KEYCODE_BACK:
+            case KeyEvent.KEYCODE_BUTTON_B:
+                return KeyEvent.KEYCODE_ESCAPE;
+            case KeyEvent.KEYCODE_DPAD_CENTER:
+            case KeyEvent.KEYCODE_BUTTON_A:
+                return KeyEvent.KEYCODE_ENTER;
+            case KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE:
+            case KeyEvent.KEYCODE_MEDIA_PLAY:
+            case KeyEvent.KEYCODE_MEDIA_PAUSE:
+            case KeyEvent.KEYCODE_BUTTON_START:
+                return KeyEvent.KEYCODE_P;
+            case KeyEvent.KEYCODE_MENU:
+                return KeyEvent.KEYCODE_M;
+            default:
+                return 0;
+        }
+    }
+
     @Override
     public boolean dispatchKeyEvent(KeyEvent e) {
-        if (e.getKeyCode() == KeyEvent.KEYCODE_BACK) {
-            // Back pauses; Home (handled by the system) leaves the app.
-            int action = e.getAction();
-            if (action == KeyEvent.ACTION_DOWN && e.getRepeatCount() == 0) {
-                web.dispatchKeyEvent(new KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_ESCAPE));
-            } else if (action == KeyEvent.ACTION_UP) {
-                web.dispatchKeyEvent(new KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_ESCAPE));
-            }
-            return true;
-        }
-        return super.dispatchKeyEvent(e);
+        int mapped = mapKey(e.getKeyCode());
+        if (mapped == 0) return super.dispatchKeyEvent(e);
+        // Back must never close the app; Home (the system's) does that.
+        web.dispatchKeyEvent(new KeyEvent(e.getDownTime(), e.getEventTime(), e.getAction(),
+            mapped, e.getRepeatCount()));
+        return true;
     }
 
     @Override

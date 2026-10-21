@@ -9,6 +9,7 @@ const STEER = {
 };
 
 export function bindInput(h) {
+  const tv = location.search.includes('tv') || /FireTVApp|AFT/.test(navigator.userAgent);
   const state = { touch: window.matchMedia?.('(pointer: coarse)').matches ?? false };
   const held = new Set();
 
@@ -22,7 +23,7 @@ export function bindInput(h) {
   window.addEventListener('keydown', e => {
     const k = e.code;
     if (GAME_KEYS.has(k)) e.preventDefault();
-    if (e.target?.closest?.('button') && (k === 'Space' || k === 'Enter')) return;
+    if (!tv && e.target?.closest?.('button') && (k === 'Space' || k === 'Enter')) return;
     if (STEER[k]) { held.add(k); steer(); }
     if (e.repeat) return;
     switch (k) {
