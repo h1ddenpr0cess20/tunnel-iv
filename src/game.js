@@ -138,7 +138,9 @@ export function createGame(events) {
         // Stop short of whatever is stuck across its way, never through it.
         for (const o of S.deb) {
           const gap = o.kind === 'jackknife' ? 12 : o.kind === 'buried' && Math.abs(o.x - d.x) < 2.4 ? 5.5 : 0;
-          if (gap && d.z < o.z && d.z > o.z - gap - 1.5) { d.z = Math.min(d.z, o.z - gap); d.vz = 0; }
+          if (!gap || Math.abs(d.z - o.z) >= gap) continue;
+          // Behind it: hold there. Already alongside it (spawned there): move on past it.
+          if (d.z < o.z) { d.z = o.z - gap; d.vz = 0; } else d.z = o.z + gap;
         }
         const blink = Math.floor(S.T * 1.7 + d.seed * 2) % 2 === 0;
         d.glow = d.hazard ? (blink ? 1 : 0.25) : 0.35;
