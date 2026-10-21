@@ -373,9 +373,10 @@ function car() {
   const L = 4.6;
   grid(tris, 48, 32, (u, v) => {
     const z = -L / 2 + L * v;
-    const end = Math.pow(Math.sin(Math.PI * (0.025 + 0.95 * v)), 0.22);
+    // The nose tapers and rounds off; the tail is blunter, cut off squarer.
+    const end = Math.pow(Math.sin(Math.PI * (0.025 + 0.95 * v)), v < 0.5 ? 0.1 : 0.3);
     // The top: trunk, the deck under the windows, and the hood dropping to the nose.
-    const top = v < 0.18 ? 0.94 + 0.05 * smooth(0, 0.18, v) : v < 0.68 ? 0.99 - 0.06 * smooth(0.55, 0.68, v) : 0.93 - 0.13 * Math.pow((v - 0.68) / 0.32, 1.6);
+    const top = v < 0.18 ? 0.9 + 0.09 * smooth(0, 0.18, v) : v < 0.68 ? 0.99 - 0.06 * smooth(0.55, 0.68, v) : 0.93 - 0.13 * Math.pow((v - 0.68) / 0.32, 1.6);
     // The bottom: up over each wheel.
     let yb = 0.24;
     for (const az of AXLES) yb = Math.max(yb, 0.24 + 0.42 * Math.sqrt(Math.max(0, 1 - ((z - az) / 0.46) ** 2)));
@@ -398,10 +399,32 @@ function car() {
     sweep(tris, [[sx * 0.8, 0.95, 0.66, 0.025, 0.02], [sx * 0.95, 0.99, 0.6, 0.05, 0.04], [sx * 1.0, 1.0, 0.58, 0.04, 0.035]],
       { region: REGION.BODY, side: [0, 1, 0], segs: 8 });
     for (const z of AXLES) {
-      torus(tris, [sx * 0.76, 0.33, z], [1, 0, 0], 0.21, 0.115, REGION.TIRE, 22, 10);
-      disc(tris, [sx * 0.83, 0.33, z], [sx, 0, 0], 0.19, REGION.RIM);
+      const c = [sx * 0.76, 0.33, z], n = [sx, 0, 0];
+      torus(tris, c, [1, 0, 0], 0.21, 0.115, REGION.TIRE, 28, 10);
+      // A dark dish behind five spokes and a hub cap.
+      disc(tris, [sx * 0.8, 0.33, z], n, 0.18, REGION.BLACK);
+      disc(tris, [sx * 0.83, 0.33, z], n, 0.19, REGION.RIM);
+      for (let k = 0; k < 5; k++) {
+        const th = (k / 5) * Math.PI * 2;
+        const rim = [sx * 0.845, 0.33 + 0.16 * Math.cos(th), z + 0.16 * Math.sin(th)];
+        sweep(tris, [[sx * 0.85, 0.33, z, 0.02, 0.02], [...rim, 0.016, 0.016]], { region: REGION.BLACK, segs: 6, per: 1, caps: 2 });
+      }
+      sweep(tris, [[sx * 0.84, 0.33, z, 0.05, 0.05], [sx * 0.87, 0.33, z, 0.04, 0.04]], { region: REGION.RIM, side: [0, 1, 0], segs: 10, per: 1, caps: 2 });
     }
   }
+  // Bumpers wrapping the nose and the tail, and a dark grille in the nose.
+  for (const [s, y] of [[1, 0.4], [-1, 0.45]]) {
+    sweep(tris, [[-0.74, y, s * 1.86, 0.07, 0.06], [-0.6, y, s * 2.1, 0.07, 0.06], [-0.3, y, s * 2.24, 0.07, 0.06],
+      [0.3, y, s * 2.24, 0.07, 0.06], [0.6, y, s * 2.1, 0.07, 0.06], [0.74, y, s * 1.86, 0.07, 0.06]],
+      { region: REGION.BLACK, side: [0, 1, 0], segs: 8, per: 4, caps: 3 });
+  }
+  sweep(tris, [[-0.32, 0.56, 2.26, 0.04, 0.04], [0.32, 0.56, 2.26, 0.04, 0.04]], { region: REGION.BLACK, side: [0, 1, 0], segs: 8, per: 1, caps: 2 });
+  sweep(tris, [[-0.32, 0.52, 2.25, 0.04, 0.04], [0.32, 0.52, 2.25, 0.04, 0.04]], { region: REGION.BLACK, side: [0, 1, 0], segs: 8, per: 1, caps: 2 });
+  // Door handles and a roof antenna.
+  for (const sx of [-1, 1]) for (const z of [-0.45, 0.65]) {
+    sweep(tris, [[sx * 0.9, 0.8, z - 0.1, 0.018, 0.018], [sx * 0.93, 0.8, z + 0.1, 0.018, 0.018]], { region: REGION.BLACK, segs: 6, per: 1, caps: 2 });
+  }
+  sweep(tris, [[0.3, 1.38, -1.1, 0.01, 0.01], [0.38, 1.62, -1.5, 0.006, 0.006]], { region: REGION.BLACK, segs: 6, per: 1, caps: 2 });
   // The axles, between each pair of wheels.
   for (const z of AXLES) sweep(tris, [[-0.76, 0.33, z, 0.05, 0.05], [0.76, 0.33, z, 0.05, 0.05]], { region: REGION.FRAME, side: [0, 1, 0], segs: 10, per: 1, caps: 2 });
   return tris;

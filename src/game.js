@@ -135,6 +135,11 @@ export function createGame(events) {
           d.vx += ((clamp(d.tx - d.x, -1, 1) * 1.6) - d.vx) * (1 - Math.exp(-dt * 2));
           d.yaw = Math.atan2(d.vx, d.vz);
         }
+        // Stop short of whatever is stuck across its way, never through it.
+        for (const o of S.deb) {
+          const gap = o.kind === 'jackknife' ? 12 : o.kind === 'buried' && Math.abs(o.x - d.x) < 2.4 ? 5.5 : 0;
+          if (gap && d.z < o.z && d.z > o.z - gap - 1.5) { d.z = Math.min(d.z, o.z - gap); d.vz = 0; }
+        }
         const blink = Math.floor(S.T * 1.7 + d.seed * 2) % 2 === 0;
         d.glow = d.hazard ? (blink ? 1 : 0.25) : 0.35;
       },
@@ -749,7 +754,7 @@ export function createGame(events) {
       }
       for (const l of d.lamps) {
         const o = qRot(qd, l.at);
-        lamps.push({ pos: [cx + d.x + o[0], cy + d.y + o[1], d.z - S.s + o[2]], k: l.tail ? d.glow || 0.4 : 0.55, marker: l.marker });
+        lamps.push({ pos: [cx + d.x + o[0], cy + d.y + o[1], d.z - S.s + o[2]], k: l.tail ? 0.7 * (d.glow || 0.4) : 0.55, marker: l.marker });
       }
     }
     return out;
