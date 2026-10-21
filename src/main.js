@@ -18,7 +18,7 @@ if (tv) {
     el.textContent = el.textContent.replace(/press space/i, 'Press Select').replace('Press P ', 'Press Play/Pause ');
   }
 }
-let particles = Number(params.get('particles')) || (tv ? 15000 : coarse ? 30000 : 70000);
+let particles = Number(params.get('particles')) || (tv ? 6000 : coarse ? 30000 : 70000);
 
 const hud = createHud(store);
 hud.sound(Sound.muted);
@@ -71,7 +71,7 @@ window.addEventListener('blur', () => game.setPaused(true));
 
 // A TV stick's GPU can't shade a full 1080p frame of this, so draw it at a
 // fixed lower height and let the browser scale it up; slow frames lower it.
-let tvHeight = Number(params.get('height')) || 540;
+let tvHeight = Number(params.get('height')) || 360;
 function resize(canvas) {
   let dpr = Math.min(coarse ? 1.5 : 2, window.devicePixelRatio || 1);
   if (tv) dpr = Math.min(dpr, tvHeight / Math.max(1, canvas.clientHeight));
@@ -95,8 +95,13 @@ async function boot() {
   let last = null, start = null, meters = 0;
   // If frames run slow, thin the snow out until they don't.
   let slow = 0, frames = 0;
+  // On a TV, draw every other frame: a steady 30 beats a stuttering 60.
+  const interval = tv ? 1000 / (Number(params.get('fps')) || 30) : 0;
+  let drawn = -1e9;
   function tick(now) {
     requestAnimationFrame(tick);
+    if (now - drawn < interval - 5) return;
+    drawn = now;
     start ??= now;
     const dt = last == null ? 0 : Math.min(0.05, Math.max(0, (now - last) / 1000));
     last = now;
@@ -112,11 +117,11 @@ async function boot() {
 
     if (!params.get('particles') && !document.hidden && dt > 0) {
       frames++;
-      if (dt > 1 / 40) slow++;
+      if (dt > (interval ? 1.4 * interval / 1000 : 1 / 40)) slow++;
       if (frames >= 90) {
         if (slow > 45) {
-          if (tv && tvHeight > 360 && !params.get('height')) tvHeight = Math.max(360, Math.round(tvHeight * 0.85));
-          else if (particles > (tv ? 8000 : 20000)) particles = Math.round(particles * 0.75);
+          if (tv && tvHeight > 270 && !params.get('height')) tvHeight = Math.max(270, Math.round(tvHeight * 0.85));
+          else if (particles > (tv ? 3000 : 20000)) particles = Math.round(particles * 0.75);
         }
         frames = 0; slow = 0;
       }
