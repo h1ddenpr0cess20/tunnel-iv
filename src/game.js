@@ -216,9 +216,13 @@ export function createGame(events) {
       { mesh: MESH.BOXS, mat: MAT.TRAILER, off: [0, 2.55, 0], scl: [1.3, 1.35, 7.2] },
       { mesh: MESH.BOXS, mat: MAT.TRACTOR, off: [-side * 0.8, 1.9, 9.1], scl: [1.25, 1.5, 1.4], rot: qAxis(Y_AXIS, side * 0.9) },
     ];
+    // The trailer's frame rails, and under them each axle: hangers up to the
+    // rails, an axle, a tire at each end.
+    parts.push({ mesh: MESH.BOXS, mat: MAT.TRACTOR, off: [0, 1.07, 0], scl: [1.0, 0.14, 6.6] });
     for (const tz of [-5.9, -4.7]) {
-      parts.push({ mesh: MESH.AXLE, off: [0, 0.45, tz], scl: [0.95, 1, 1] });
-      for (const tx of [-0.95, 0.95]) parts.push({ mesh: MESH.TIRE, off: [tx, 0.45, tz], scl: [1.2, 1.2, 1.2] });
+      parts.push({ mesh: MESH.AXLE, off: [0, 0.54, tz], scl: [0.95, 1.6, 1.6] });
+      parts.push({ mesh: MESH.BOXS, mat: MAT.TRACTOR, off: [0, 0.82, tz], scl: [0.7, 0.25, 0.14] });
+      for (const tx of [-0.95, 0.95]) parts.push({ mesh: MESH.TIRE, off: [tx, 0.54, tz], scl: [1.45, 1.45, 1.45] });
     }
     const a = -len / 2 + 1.3, b = len / 2 - 1.3;
     return thing('jackknife', z + dz / 2, {
