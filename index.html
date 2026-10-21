@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b0b0c">
+<title>Neverending Tunnel IV</title>
+</head>
+<body>
+<canvas id="tunnel" role="img" aria-label="Driving a snowplow down a highway in a whiteout, seen from the cab, with the storm swirling overhead like ink"></canvas>
+
+<div class="hud" id="hud" hidden>
+  <div class="stat">
+    <span class="lab">Distance plowed</span>
+    <span class="val" id="dist">0 m</span>
+  </div>
+  <div class="stat right">
+    <span class="lab">Next exit</span>
+    <span class="val light" id="light">800.00 m</span>
+  </div>
+</div>
+
+<p class="whisper" id="whisper" aria-live="polite"></p>
+
+<section class="panel" id="title">
+  <h1>Neverending Tunnel <span class="iii">IV</span></h1>
+  <p class="sub">whiteout on the highway</p>
+  <p class="lede">The next exit is just up ahead. Keep the road open till you get there.</p>
+  <dl class="keys kb-only">
+    <dt><kbd>←</kbd> <kbd>→</kbd></dt><dd>steer across the road</dd>
+    <dt><kbd>↑</kbd> <kbd>Space</kbd></dt><dd>sound the horn</dd>
+    <dt><kbd>A</kbd> <kbd>D</kbd> <kbd>W</kbd></dt><dd>steer, horn, too</dd>
+    <dt><kbd>P</kbd> <kbd>M</kbd></dt><dd>pause, sound</dd>
+  </dl>
+  <dl class="keys touch-only">
+    <dt>drag</dt><dd>steer across the road</dd>
+    <dt>tap</dt><dd>sound the horn</dd>
+  </dl>
+  <p class="go"><span class="kb-only">Press space to roll out</span><span class="touch-only">Tap to roll out</span></p>
+  <p class="dim" id="best-title" hidden></p>
+</section>
+
+<section class="panel" id="over" hidden>
+  <h2 id="over-head">off the road</h2>
+  <p class="big" id="over-dist">0 m</p>
+  <p class="lede" id="over-light"></p>
+  <p class="dim" id="over-best"></p>
+  <p class="go"><span class="kb-only">Press space to get back on the road</span><span class="touch-only">Tap to get back on the road</span></p>
+</section>
+
+<section class="panel" id="paused" hidden>
+  <h2>paused</h2>
+  <p class="go"><span class="kb-only">Press P to keep driving</span><span class="touch-only">Tap to keep driving</span></p>
+</section>
+
+<section class="panel" id="error" hidden>
+  <h2>WebGPU or WebGL 2 is needed</h2>
+  <p class="lede" id="error-msg"></p>
+  <p class="dim">Try a current version of Chrome, Edge, Firefox or Safari.</p>
+</section>
+
+<button class="ctl" id="pause" type="button" hidden>Pause</button>
+<button class="ctl" id="snd" type="button">Sound on</button>
+
+<script type="module" src="/src/main.js"></script>
+</body>
+</html>
