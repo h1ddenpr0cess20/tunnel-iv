@@ -72,25 +72,24 @@ go by.
 ## Sound
 
 All made as it plays, with Web Audio, no samples. The band plays the
-game's song, "Whiteout on the Highway": hard, driving metal in D minor at
-185 beats a minute, the guitars in drop D, the verses going D, B flat, A,
-the choruses D, B flat, C. The vocal hook is sung by two lead guitars in
-harmony a third apart, up to a belted high B flat and a long high E that
-slides down to D. It opens on one held, bent high D; there's a half-time
-bridge that lifts back up, and a solo of long bends and runs. The sound is
-after the [Madness Engine](https://github.com/h1ddenpr0cess20/madness-engine)'s
-band (Metroll's): the rhythm guitars a wall of detuned-saw power chords,
-one rig hard left and one hard right a hair late, the mids pushed into a
-hard clipper, the lows put back, the middle scooped; palm-muted, they're
-darkened before the amp so they thud. The bass drives eighths and steps
-into each change. The drums are a metal kit (the beater's click on the
-kick, a cracking snare, toms, a china), driving eighths on the kick in the
-choruses, double bass under the solo, a fill into every change. A dark
-string pad hangs over the choruses. The band is scheduled a second ahead
-on its own timer, so a slow frame can't make it stumble. When you crash,
-it hits one last chord and the lead dives off the end of the whammy bar.
-Under it all: the diesel changing gear, the blade scraping the road, the
-blizzard howling round the cab, the air horn and the wipers.
+game's song, "Whiteout on the Highway", as a chip tune, after the
+chiptune cut of the theme: D minor at 187 beats a minute. A pad of chords
+opens it and a twelve-bar theme climbs over arpeggios; the verses sit on
+D minor, stepping down through C and B flat to A; the chorus goes B flat,
+F, C, D minor, its hook sung by a pulse lead with a second a third under
+it on the other side, up to a held high C, down to G and home on A, and a
+post-chorus reaches for B flat and slides back down. After the second
+chorus there's a break of stabs, a bridge on B flat, C and D minor, a
+lift on A, a breakdown of pulsing chords and a drop; the last chorus goes
+up a whole step, to E minor, and an outro brings it round to the verse
+again. The voices are an old sound chip's: pulse waves of different
+widths for the leads, the chords and the arpeggios, a triangle for the
+bass, and 1-bit noise (with a triangle dropping under the kick) for the
+drums, a fill into every change. The band is scheduled a second ahead on
+its own timer, so a slow frame can't make it stumble. When you crash, it
+hits one last chord and the lead dives off the end. Under it all: the
+diesel changing gear, the blade scraping the road, the blizzard howling
+round the cab, the air horn and the wipers.
 
 ## Layout
 
