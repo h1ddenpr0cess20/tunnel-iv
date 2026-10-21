@@ -220,7 +220,11 @@ export const Sound = {
     if (this.ac) { if (this.ac.state === 'suspended') this.ac.resume(); return; }
     const AC = window.AudioContext || window.webkitAudioContext;
     if (!AC) return;
-    try { this.ac = new AC(LITE ? { latencyHint: 'playback' } : undefined); } catch { return; }
+    try {
+      // Half the sample rate is half the work for the audio thread.
+      try { this.ac = new AC(LITE ? { latencyHint: 'playback', sampleRate: 22050 } : undefined); }
+      catch { this.ac = new AC(); }
+    } catch { return; }
     const ac = this.ac;
     this.out = ac.createGain();
     this.out.gain.value = this.muted ? 0 : LEVEL;
@@ -239,6 +243,9 @@ export const Sound = {
 
     this.initBand(comp);
     setInterval(() => this.schedule(), 100);
+    // A starved audio thread can leave the context suspended or interrupted:
+    // bring it back unless the game itself is paused.
+    setInterval(() => { if (!this.held && this.ac.state !== 'running') this.ac.resume().catch(() => {}); }, 1000);
     this.initTruck();
   },
 
@@ -534,7 +541,7 @@ export const Sound = {
     if (this.out) this.out.gain.setTargetAtTime(m ? 0 : LEVEL, this.ac.currentTime, 0.05);
   },
 
-  suspend(p) { if (this.ac) (p ? this.ac.suspend() : this.ac.resume()); },
+  suspend(p) { this.held = p; if (this.ac) (p ? this.ac.suspend() : this.ac.resume()); },
 
   ok() { return this.ac && !this.muted && this.ac.state === 'running'; },
 
