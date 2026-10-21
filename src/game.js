@@ -108,7 +108,7 @@ export function createGame(events) {
       cols: [{ a: [0, 0.15, 0], b: [0, 1.6, 0], r: 0.32 }, { a: [0.1, 1.1, 0.34], b: [0.3, 1.7, -0.8], r: 0.12 }],
       tick(d, dt) {
         const L = d.leap;
-        if (!L.go && S.mode === 'run' && d.z - S.s < Math.max(S.speed, 12) * 1.35) { L.go = true; events.leap(); }
+        if (!L.go && S.mode === 'run' && d.z - S.s < Math.max(S.speed, 12) * 1.35) { L.go = true; if (!S.planning) events.leap(); }
         if (L.go) L.u += dt / 1.3;
         const u = clamp(L.u, 0, 1);
         d.x = L.x0 + (L.x1 - L.x0) * smooth(u * 1.1 - 0.05);
@@ -123,13 +123,15 @@ export function createGame(events) {
   // A car crawling along with its hazards on, sometimes changing lanes.
   function car(z, x, o = {}) {
     return thing(o.kind || 'car', z, {
+      // Whether and when it changes lanes is settled now, so the road ahead can be planned.
       x, vz: rnd(5, 10), tx: x, hazard: Math.random() < 0.7, snow: 0.7, reach: 4,
+      change: Math.random() < 0.5 ? { at: S.T + rnd(1, 7), to: pick(LANES) } : null,
       parts: [{ mesh: MESH.CAR, off: [0, 0, 0] }],
       cols: [{ a: [0, 0.6, -1.75], b: [0, 0.6, 1.75], r: 0.9 }, { a: [0, 1.05, -0.9], b: [0, 1.05, 0.5], r: 0.62 }],
       lamps: [{ at: [-0.68, 0.82, -2.27], tail: true }, { at: [0.68, 0.82, -2.27], tail: true }],
       tick(d, dt) {
         if (d.kind === 'car') {
-          if (Math.random() < dt * 0.08) d.tx = pick(LANES);
+          if (d.change && S.T >= d.change.at) { d.tx = d.change.to; d.change = null; }
           d.vx += ((clamp(d.tx - d.x, -1, 1) * 1.6) - d.vx) * (1 - Math.exp(-dt * 2));
           d.yaw = Math.atan2(d.vx, d.vz);
         }
@@ -248,18 +250,14 @@ export function createGame(events) {
 
   function inLane(x) { return clamp(x + rnd(-0.8, 0.8), -X_MAX, X_MAX); }
 
-  // One pattern at S.next.
+  // One pattern of `type` at depth z; returns how deep it is.
   const FIRST = ['drift', 'robot', 'car', 'crew', 'buried', 'walker', 'jackknife', 'spin', 'tire', 'leaper'];
-  function spawn() {
-    const diff = Math.min(1, S.runT / 180);
-    const v = Math.max(S.speed, 15);
-    const z = S.next;
-    let type = FIRST[S.spawned];
-    if (!type) {
-      const r = Math.random();
-      type = r < 0.17 ? 'robot' : r < 0.27 ? 'crew' : r < 0.43 ? 'car' : r < 0.53 ? 'buried' : r < 0.63 ? 'walker'
-        : r < 0.7 ? 'jackknife' : r < 0.77 ? 'spin' : r < 0.85 ? 'tire' : r < 0.92 ? 'leaper' : 'drift';
-    }
+  const anyType = () => {
+    const r = Math.random();
+    return r < 0.17 ? 'robot' : r < 0.27 ? 'crew' : r < 0.43 ? 'car' : r < 0.53 ? 'buried' : r < 0.63 ? 'walker'
+      : r < 0.7 ? 'jackknife' : r < 0.77 ? 'spin' : r < 0.85 ? 'tire' : r < 0.92 ? 'leaper' : 'drift';
+  };
+  function pattern(type, z, diff) {
     let depth = 2;
     if (type === 'robot') {
       robot(z, inLane(S.x));
@@ -309,16 +307,38 @@ export function createGame(events) {
       for (let i = 0; i < n; i++) drift(z + rnd(0, 12), rnd(-ROAD_W + 1, ROAD_W - 1));
       depth = 12;
     }
+    return depth;
+  }
+
+  // The next pattern, at S.next, but only one that leaves a way through
+  // everything already on the road ahead (moving things included, where
+  // they'll be when you get there). If a few tries all close the road,
+  // it's a drift: you can always plow through those.
+  function spawn() {
+    const diff = Math.min(1, S.runT / 180);
+    const v = Math.max(S.speed, 15);
+    const z = S.next;
+    let depth = 2;
+    for (let tries = 0; ; tries++) {
+      const type = tries === 0 && FIRST[S.spawned] ? FIRST[S.spawned] : tries < 5 ? anyType() : 'drift';
+      const before = S.id;
+      depth = pattern(type, z, diff);
+      // Passable steering at a third of what the truck can, and with room
+      // to spare: what's planned is only looked at every twentieth of a second.
+      if (type === 'drift' || passable(false, 0.35, CLEAR + 0.25)) break;
+      S.deb = S.deb.filter(d => d.id < before);
+    }
     S.spawned++;
     S.next = z + depth + Math.max(22, v * (1.4 - 0.5 * diff) + Math.random() * v * (1.1 - 0.4 * diff));
   }
 
   // ---- your truck -----------------------------------------------------------
-  // A point in the truck's frame, on the road (relative to its middle): the
-  // truck turned by its yaw and moved to where it is.
+  // A point in the truck's frame, on the road (relative to its middle). What
+  // you hit with is the truck pointing straight down the road, whichever way
+  // it's crabbing as you steer, so it's the same as what the way through
+  // is planned for.
   function onRoad(p) {
-    const c = Math.cos(S.yaw), s = Math.sin(S.yaw);
-    return [S.x + p[0] * c + p[2] * s, p[1], S.s - p[0] * s + p[2] * c];
+    return [S.x + p[0], p[1], S.s + p[2]];
   }
 
   function colliders(d) {
@@ -327,6 +347,125 @@ export function createGame(events) {
 
   function moveAll(dt) {
     for (const d of S.deb) place(d, dt);
+  }
+
+  // ---- the way through --------------------------------------------------------
+  // Is there still a way through everything on the road ahead? Copies of it
+  // all are run on (everything on the road moves by rules settled when it
+  // turns up, and your speed down the road only goes with time, so this is
+  // exactly what will happen), and at each step we keep the stretches
+  // across the road you could have steered to by then without coming
+  // within `clear` of anything, steering at `ability` of what the truck
+  // can. If that ever comes to nothing, the road is closed. With `path`, it
+  // also hands back one way through: where across the road to be, step by
+  // step.
+  const PLAN_DT = 1 / 20, PLAN_DX = 0.3, CLEAR = HIT_R + 0.3, EDGE = X_MAX - 0.2;
+  const PLAN_XS = Array.from({ length: Math.round(2 * EDGE / PLAN_DX) + 1 }, (_, i) => -EDGE + i * PLAN_DX);
+  // The stretches of road (as [from, to] across it) where your truck would
+  // be clear of these colliders, all the way from `back` behind where it is
+  // (where it was a step ago): found on a grid, their edges refined.
+  function clearings(cols, back, clear) {
+    if (!cols.length) return [[-EDGE, EDGE]];
+    const hit = x => cols.some(c => TRUCK_COLS.some(m => [0, 0.5, 1].some(k => {
+      const z = S.s - back * k;
+      return segDist([x + m.a[0], m.a[1], z + m.a[2]], [x + m.b[0], m.b[1], z + m.b[2]], c.a, c.b) - c.r - m.r <= clear;
+    })));
+    const edge = (lo, hi) => {   // lo clear, hi blocked (or the other way round)
+      const loHit = hit(lo);
+      for (let i = 0; i < 6; i++) { const mid = (lo + hi) / 2; if (hit(mid) === loHit) lo = mid; else hi = mid; }
+      return loHit ? hi : lo;
+    };
+    const out = [];
+    let from = null;
+    PLAN_XS.forEach((x, i) => {
+      const clear = !hit(x);
+      if (clear && from === null) from = i === 0 ? x : edge(PLAN_XS[i - 1], x);
+      if (!clear && from !== null) { out.push([from, edge(PLAN_XS[i - 1], x)]); from = null; }
+    });
+    if (from !== null) out.push([from, EDGE]);
+    return out;
+  }
+  // Intervals: grown by d either side, and where two sets of them overlap.
+  const grow = (R, d) => {
+    const out = [];
+    for (const [lo, hi] of R.map(([lo, hi]) => [Math.max(-EDGE, lo - d), Math.min(EDGE, hi + d)])) {
+      const last = out[out.length - 1];
+      if (last && lo <= last[1]) last[1] = Math.max(last[1], hi); else out.push([lo, hi]);
+    }
+    return out;
+  };
+  const meet = (A, B) => {
+    const out = [];
+    for (const [a0, a1] of A) for (const [b0, b1] of B) { const lo = Math.max(a0, b0), hi = Math.min(a1, b1); if (lo <= hi) out.push([lo, hi]); }
+    return out;
+  };
+  // Intervals moved by d.
+  const shift = (R, d) => R.map(([lo, hi]) => [lo + d, hi + d]);
+  // Five speeds across the road (left fast, left, still, right, right fast),
+  // each step able to change by one: the truck takes a moment to swing over.
+  const SPEEDS = [-2, -1, 0, 1, 2];
+  function passable(path = false, ability = 0.6, clear = CLEAR) {
+    const ghosts = S.deb.filter(d => !d.harmless).map(d => ({
+      ...d, leap: d.leap && { ...d.leap }, dodge: d.dodge && { ...d.dodge }, change: d.change && { ...d.change },
+    }));
+    if (!ghosts.length) return path ? [] : true;
+    const saved = { s: S.s, T: S.T, speed: S.speed, runT: S.runT, planning: false };
+    S.planning = true;
+    const h = STEER_V * ability / 2 * PLAN_DT;   // how far one speed step moves you in a step
+    const lv = Math.max(-2, Math.min(2, Math.round(S.vx / (STEER_V * ability / 2))));
+    const x0 = Math.max(-EDGE, Math.min(EDGE, S.x));
+    let R = SPEEDS.map(v => (v === lv ? [[x0, x0]] : []));
+    const steps = [];
+    let ok = true;
+    // On till you're past them all (where they'll be by then: cars drive on).
+    for (let i = 0; i < 400 && ghosts.some(d => d.z + d.reach + 3 > S.s); i++) {
+      S.runT += PLAN_DT; S.T += PLAN_DT;
+      S.speed += (rideSpeed(S.runT) - S.speed) * (1 - Math.exp(-PLAN_DT * 0.8));
+      S.s += S.speed * PLAN_DT;
+      for (const d of ghosts) place(d, PLAN_DT);
+      const near = ghosts.filter(d => Math.abs(d.z - S.s) < d.reach + 4 && !(d.leap && !d.live));
+      const open = clearings(near.flatMap(colliders), S.speed * PLAN_DT, clear);
+      R = SPEEDS.map((v, k) => {
+        const from = [R[k - 1], R[k], R[k + 1]].filter(Boolean).flat().sort((a, b) => a[0] - b[0]);
+        return meet(grow(shift(from, v * h), h / 2), open);
+      });
+      if (path) steps.push({ R, open });
+      if (R.every(r => !r.length)) { ok = false; break; }
+    }
+    Object.assign(S, saved);
+    if (!path) return ok;
+    if (!ok) return null;
+    if (!steps.length) return [];
+    // Back from the end: at each step, a speed within one of the next and
+    // a place it could have come from, as near the middle of its clearing
+    // as that allows. (Every place reachable at a step was reached from one
+    // within h/2 of it at the step before; EPS is slack for rounding.)
+    const EPS = 1e-6;
+    const end = steps[steps.length - 1];
+    let k = -1;
+    end.R.forEach((r, j) => { if (r.length && (k < 0 || Math.abs(SPEEDS[j]) < Math.abs(SPEEDS[k]))) k = j; });
+    const widest = end.R[k].reduce((w, r) => (r[1] - r[0] > w[1] - w[0] ? r : w));
+    let x = (widest[0] + widest[1]) / 2;
+    const xs = [x];
+    for (let i = steps.length - 2; i >= 0; i--) {
+      const c = x - SPEEDS[k] * h;
+      let pick = null;
+      for (const j of [k, k - 1, k + 1].filter(j => j >= 0 && j < SPEEDS.length).sort((a, b) => Math.abs(SPEEDS[a]) - Math.abs(SPEEDS[b]))) {
+        for (const [lo, hi] of steps[i].R[j]) {
+          const a = Math.max(lo, c - h / 2), b = Math.min(hi, c + h / 2);
+          if (a > b + EPS) continue;
+          if (a > b) { pick = { j, x: (a + b) / 2 }; break; }
+          // As near the middle of its clearing as it can be.
+          const o = steps[i].open.find(([o0, o1]) => o0 - EPS <= a && b <= o1 + EPS) || [a, b];
+          pick = { j, x: Math.min(b, Math.max(a, (o[0] + o[1]) / 2)) };
+          break;
+        }
+        if (pick) break;
+      }
+      k = pick.j; x = pick.x;
+      xs.unshift(x);
+    }
+    return xs;
   }
 
   // ---- actions --------------------------------------------------------------
@@ -389,18 +528,19 @@ export function createGame(events) {
     S.vx += (sx * STEER_V - S.vx) * (1 - Math.exp(-6 * dt));
     S.x += S.vx * dt;
     if (Math.abs(S.x) > X_MAX) {
-      // Into the bank: it shoves you back, slows you and loads the blade.
+      // Into the bank: it shoves you back and loads the blade. (Nothing
+      // changes your speed down the road but time: it's what the way
+      // through is planned on.)
       S.x = Math.sign(S.x) * X_MAX;
       if (S.vx * S.x > 0) {
         if (S.scrape <= 0) events.scrape(Math.min(1, Math.abs(S.vx) / STEER_V));
         S.scrape = 0.35;
         S.vx = 0;
-        S.speed *= 1 - dt * 0.6;
         S.load = Math.max(S.load, 0.8);
         S.shake = Math.max(S.shake, 0.25);
       }
     }
-    S.yaw += (Math.atan2(S.vx, Math.max(S.speed, 4)) - S.yaw) * (1 - Math.exp(-8 * dt));
+    S.yaw += (0.5 * Math.atan2(S.vx, Math.max(S.speed, 4)) - S.yaw) * (1 - Math.exp(-8 * dt));
     if (sy > 0.5 && !S.upHeld) horn();
     S.upHeld = sy > 0.5;
     S.s += S.speed * dt;
@@ -415,7 +555,7 @@ export function createGame(events) {
         if (!d.plowed && Math.abs(d.z - bladeZ) < 1 && Math.abs(d.x - S.x) < BLADE.w + d.parts[0].scl[0] * 0.6) {
           d.plowed = true;
           const k = Math.min(1, d.parts[0].scl[1] * d.parts[0].scl[0] / 1.6);
-          S.load = 1; S.speed *= 1 - 0.07 * k; S.shake = Math.max(S.shake, 0.45 * k);
+          S.load = 1; S.shake = Math.max(S.shake, 0.45 * k);
           events.plow(k);
         }
         continue;
@@ -472,7 +612,7 @@ export function createGame(events) {
         const want = 1.2 * Math.sin(S.T * 0.17);
         S.vx = (want - S.x) * 0.6;
         S.x += S.vx * dt;
-        S.yaw = Math.atan2(S.vx, Math.max(S.speed, 4));
+        S.yaw = 0.5 * Math.atan2(S.vx, Math.max(S.speed, 4));
       }
       S.roll *= Math.exp(-dt * 2);
       moveAll(dt);
@@ -613,7 +753,7 @@ export function createGame(events) {
   }
 
   return {
-    S, start, setPaused, nudge, horn, update, camera, parts, meters, spawn,
+    S, start, setPaused, nudge, horn, update, camera, parts, meters, spawn, passable,
     things: { robot, walker, leaper, car, spinner, buried, drift, looseTire, jackknife, crew },
   };
 }
