@@ -12,15 +12,16 @@ const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').mat
 const coarse = window.matchMedia?.('(pointer: coarse)').matches ?? false;
 const params = new URLSearchParams(location.search);
 const tv = params.has('tv') || /FireTVApp|AFT/.test(navigator.userAgent);
-// `?lite` is for weak devices: low resolution, little snow, 30 fps.
-const lite = params.has('lite');
+// Lite (the default on a TV; `?full` turns it off): a set lower resolution,
+// less snow, 30 fps.
+const lite = params.has('lite') || (tv && !params.has('full'));
 if (tv) {
   // No space bar on a remote: Select rolls out.
   for (const el of document.querySelectorAll('.go .kb-only')) {
     el.textContent = el.textContent.replace(/press space/i, 'Press Select').replace('Press P ', 'Press Play/Pause ');
   }
 }
-let particles = Number(params.get('particles')) || (lite ? 10000 : tv ? 25000 : coarse ? 30000 : 70000);
+let particles = Number(params.get('particles')) || (lite ? 12000 : coarse ? 30000 : 70000);
 
 const hud = createHud(store);
 hud.sound(Sound.muted);
@@ -71,12 +72,12 @@ hud.buttons.pause.addEventListener('click', () => game.setPaused(!S.paused));
 document.addEventListener('visibilitychange', () => { if (document.hidden) game.setPaused(true); });
 window.addEventListener('blur', () => game.setPaused(true));
 
-// A TV draws at a set height (720p; lite, 540p) and lets the browser scale it
-// up; slow frames lower it.
-let tvHeight = Number(params.get('height')) || (lite ? 540 : 720);
+// Lite draws at a set height (640p) and lets the browser scale it up; slow
+// frames lower it.
+let tvHeight = Number(params.get('height')) || 640;
 function resize(canvas) {
   let dpr = Math.min(coarse ? 1.5 : 2, window.devicePixelRatio || 1);
-  if (tv || lite) dpr = Math.min(dpr, tvHeight / Math.max(1, canvas.clientHeight));
+  if (lite) dpr = Math.min(dpr, tvHeight / Math.max(1, canvas.clientHeight));
   const w = Math.max(1, Math.round(canvas.clientWidth * dpr));
   const h = Math.max(1, Math.round(canvas.clientHeight * dpr));
   if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
@@ -122,8 +123,8 @@ async function boot() {
       if (dt > (interval ? 1.4 * interval / 1000 : 1 / 40)) slow++;
       if (frames >= 90) {
         if (slow > 45) {
-          if ((tv || lite) && tvHeight > (lite ? 360 : 450) && !params.get('height')) tvHeight = Math.max(lite ? 360 : 450, Math.round(tvHeight * 0.85));
-          else if (particles > (lite ? 3000 : tv ? 6000 : 20000)) particles = Math.round(particles * 0.75);
+          if (lite && tvHeight > 450 && !params.get('height')) tvHeight = Math.max(450, Math.round(tvHeight * 0.85));
+          else if (particles > (lite ? 3000 : 20000)) particles = Math.round(particles * 0.75);
         }
         frames = 0; slow = 0;
       }
