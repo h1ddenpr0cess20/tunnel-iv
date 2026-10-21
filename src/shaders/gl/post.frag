@@ -96,6 +96,11 @@ float behind(vec2 m) {
   return mix(c, 0.86, pow(smoothstep(4.0, 80.0, dist), 0.8));
 }
 
+// The wipers' pivots. Not an array: some TV GPU compilers refuse a vec2[2].
+vec2 pivot(int k, vec2 res, float H) {
+  return vec2(res.x * (k == 0 ? 0.27 : 0.69), H * 0.035);
+}
+
 float seg(vec2 p, vec2 a, vec2 b) {
   vec2 pa = p - a;
   vec2 ba = b - a;
@@ -150,7 +155,6 @@ void main() {
 
   float col = scene(p);
 
-  vec2 pivots[2] = vec2[2](vec2(res.x * 0.27, H * 0.035), vec2(res.x * 0.69, H * 0.035));
   float reach = max(res.x * 0.4, H * 0.72);
 
   if (cab && inside > 0.0) {
@@ -164,7 +168,7 @@ void main() {
       float age = mod(t + hash2(cell + 5.7) * period, period);
       float ago = 1e6;
       for (int k = 0; k < 2; k++) {
-        vec2 d = ctr - pivots[k];
+        vec2 d = ctr - pivot(k, res, H);
         float r = length(d) / reach;
         if (r > BLADE0 && r < BLADE1) ago = min(ago, wipedAgo(atan(d.y, d.x)));
       }
@@ -204,7 +208,7 @@ void main() {
     float soft = H * 0.0025;
     float cover = 0.0;
     for (int k = 0; k < 2; k++) {
-      vec2 o = pivots[k];
+      vec2 o = pivot(k, res, H);
       float along = clamp(dot(p - o, dir) / (reach * ARM), 0.0, 1.0);
       float arm = seg(p, o, o + dir * reach * ARM + side * H * 0.004) - mix(H * 0.008, H * 0.0035, along);
       float bl = seg(p, o + dir * reach * BLADE0 + side * H * 0.005, o + dir * reach * BLADE1 + side * H * 0.005) - H * 0.0028;
