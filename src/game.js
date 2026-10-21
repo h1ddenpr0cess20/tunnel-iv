@@ -34,7 +34,7 @@ const turnBlade = p => {
 const BLADE_TOP = BLADE.z + 0.4;
 const BLADE_ENDS = [turnBlade([-BLADE.w + 0.04, BLADE.h, BLADE_TOP]), turnBlade([BLADE.w - 0.04, BLADE.h, BLADE_TOP])];
 const TRUCK_COLS = [
-  { a: turnBlade([-BLADE.w, 0.6, BLADE.z + 0.1]), b: turnBlade([BLADE.w, 0.6, BLADE.z + 0.1]), r: 0.5 },
+  { a: turnBlade([-BLADE.w + 0.05, 0.6, BLADE.z + 0.1]), b: turnBlade([BLADE.w - 0.05, 0.6, BLADE.z + 0.1]), r: 0.4 },
   { a: [0, 1.5, -2.2], b: [0, 1.5, 0.9], r: 1.2 },
 ];
 // Your headlights, for what they light up.
@@ -76,8 +76,8 @@ export function createGame(events) {
       ],
       cols: [{ a: [0, 0.2, 0], b: [0, 1.35, 0.3], r: 0.3 }, { a: [0.13, 1.0, 0.33], b: [-0.1, 0.1, 1.25], r: 0.14 }],
       tick(d) {
-        if (d.dodge) return;
-        // Twist into the throw as the scoop comes up.
+        // Twist into the throw as the scoop comes up (a crew holds its line still).
+        if (d.dodge || d.kind === 'crew') return;
         d.yaw = d.yaw0 + 0.3 * Math.sin(d.dig.w * S.T + d.dig.ph - 1.2);
       },
       ...o,
@@ -158,7 +158,7 @@ export function createGame(events) {
         { mesh: MESH.CAR, off: [0, 0, 0] },
         { mesh: MESH.MOUND, mat: MAT.SNOW, off: [0, 0.45, 0], scl: [1.45, rnd(0.75, 0.9), 3.1] },
       ],
-      cols: [{ a: [0, 0.8, -2.1], b: [0, 0.8, 2.1], r: 1.0 }],
+      cols: [{ a: [0, 0.8, -2.1], b: [0, 0.8, 2.1], r: 0.95 }],
     });
   }
 
@@ -194,7 +194,7 @@ export function createGame(events) {
   // within a gap of the other.
   function jackknife(z, diff) {
     const side = Math.random() < 0.5 ? -1 : 1;
-    const gap = 6.2 - 0.7 * diff;
+    const gap = 6.8 - 0.7 * diff;
     const xi = -side * (ROAD_W - gap), xo = side * (ROAD_W + 2.4);
     const len = 14.4, dx = xo - xi, dz = Math.sqrt(len * len - dx * dx);
     const yaw = Math.atan2(dx, dz);
@@ -215,12 +215,14 @@ export function createGame(events) {
     });
   }
 
-  // A crew of robots shovelling right across the road, with one way through.
+  // A crew of robots shovelling right across the road, facing you, with
+  // one way through: a gap gw either side of its middle, the blade needing
+  // about 3 of that, so there's a little to spare, less as it gets harder.
   function crew(z, diff) {
-    const gap = rnd(-X_MAX + 0.4, X_MAX - 0.4), gw = 3.0 - 0.35 * diff;
+    const gap = rnd(-X_MAX + 0.3, X_MAX - 0.3), gw = 3.7 - 0.4 * diff;
     for (let x = -ROAD_W + rnd(0.2, 0.8); x <= ROAD_W; x += rnd(1.5, 1.9)) {
       if (Math.abs(x - gap) < gw) continue;
-      robot(z + rnd(-0.4, 0.4), x, { kind: 'crew', yaw: Math.PI + rnd(-0.3, 0.3) });
+      robot(z + rnd(-0.4, 0.4), x, { kind: 'crew', yaw: Math.PI + rnd(-0.08, 0.08) });
     }
   }
 
@@ -268,9 +270,22 @@ export function createGame(events) {
       car(z, pick(LANES));
       if (diff > 0.4 && Math.random() < 0.6) { car(z + rnd(8, 14), pick(LANES)); depth = 14; }
     } else if (type === 'buried') {
-      const lanes = [...LANES].sort(() => Math.random() - 0.5).slice(0, 2 + (diff > 0.5 ? 1 : 0));
-      lanes.forEach((x, i) => buried(z + i * rnd(5, 9), x + rnd(-0.6, 0.6)));
-      depth = 18;
+      // Cars buried in drifts, never more than you can get round: one, or two
+      // side by side leaving an outside lane clear; or, harder, a second one
+      // in the clear lane far enough on to swerve out in time. They lie a
+      // little away from the clear lane, never into it.
+      const free = pick(LANES);
+      const away = x => x + Math.sign(x - free) * rnd(0.5, 1.0);
+      const others = LANES.filter(x => x !== free).sort(() => Math.random() - 0.5);
+      if (diff > 0.4 && Math.random() < 0.5) {
+        buried(z, away(others[0]));
+        buried(z + rnd(20, 26), free + rnd(-0.4, 0.4));
+        depth = 26;
+      } else {
+        const n = free !== 0 && Math.random() < 0.6 ? 2 : 1;
+        others.slice(0, n).forEach((x, i) => buried(z + i * rnd(4, 9), away(x)));
+        depth = 12;
+      }
     } else if (type === 'walker') {
       const n = diff > 0.4 && Math.random() < 0.6 ? 2 : 1;
       for (let i = 0; i < n; i++) {
