@@ -154,6 +154,7 @@ void main() {
   float reach = max(res.x * 0.4, H * 0.72);
 
   if (cab && inside > 0.0) {
+#ifndef LITE
     float cs = H / 13.0;
     vec2 cell = floor(p / cs);
     float h1 = hash2(cell);
@@ -186,9 +187,15 @@ void main() {
       }
     }
 
+#endif
+#ifdef LITE
+    float fr = 0.5;
+    float frost = 1.0 - smoothstep(0.0, H * 0.04, edge);
+#else
     float fr = fbm2(p / (H * 0.05));
     float reachF = H * (0.02 + 0.09 * fr * fr);
     float frost = (1.0 - smoothstep(0.0, reachF, edge)) * (0.5 + 0.5 * fbm2(p / (H * 0.012) + 4.0));
+#endif
     col = mix(col, 0.86 + 0.1 * fr, frost * 0.7);
 
     float th = wiperAt(u.c.w);
