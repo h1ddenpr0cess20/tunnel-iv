@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b0b0c">
+<title>Neverending Tunnel IV: Demastered</title>
+<style>
+  :root { color-scheme: dark; --bg: #0b0b0c; --fg: #e8e8e8; --dim: #8a8a8a; --line: #3a3a3a; }
+  * { box-sizing: border-box; }
+  body { margin: 0; min-height: 100vh; background: var(--bg); color: var(--fg); font: 15px/1.5 ui-monospace, Menlo, Consolas, monospace;
+         display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 16px; }
+  h1 { margin: 4px 0 0; font-size: 18px; font-weight: 600; letter-spacing: .12em; text-transform: lowercase; }
+  h1 span { color: var(--dim); letter-spacing: .3em; font-size: 12px; text-transform: uppercase; margin-left: .6em; }
+  .screen { position: relative; width: min(100%, 768px); aspect-ratio: 256 / 240; background: #000; border: 2px solid var(--line); border-radius: 6px; overflow: hidden; }
+  canvas { width: 100%; height: 100%; display: block; image-rendering: pixelated; }
+  .overlay { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(0,0,0,.72); text-align: center; padding: 16px; }
+  .overlay[hidden] { display: none; }
+  button { font: inherit; color: var(--fg); background: #1a1a1a; border: 1px solid #6a6a6a; border-radius: 4px; padding: 8px 16px; cursor: pointer; }
+  button:hover, button:focus-visible { background: #2c2c2c; outline: none; }
+  .bar { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+  dl.keys { display: grid; grid-template-columns: auto auto; gap: 2px 14px; margin: 0; color: var(--dim); font-size: 13px; }
+  dl.keys dt { text-align: right; color: var(--fg); } dl.keys dd { margin: 0; }
+  .pad { display: none; gap: 10px; width: min(100%, 768px); justify-content: space-between; }
+  .pad .grp { display: grid; grid-template-columns: repeat(3, 56px); grid-auto-rows: 56px; gap: 6px; }
+  .pad button { padding: 0; touch-action: none; user-select: none; }
+  @media (pointer: coarse) { .pad { display: flex; } dl.keys { display: none; } }
+  .note { color: var(--dim); font-size: 12px; max-width: 640px; text-align: center; }
+  kbd { border: 1px solid #555; border-radius: 3px; padding: 0 5px; }
+</style>
+</head>
+<body>
+<h1>neverending tunnel iv<span>demastered</span></h1>
+<div class="screen">
+  <canvas id="nes" width="256" height="240" aria-label="NES screen: driving a snowplow through a whiteout"></canvas>
+  <div class="overlay" id="start"><div><p>A real NES ROM, running on the jsnes emulator.</p><button id="go">Play</button></div></div>
+</div>
+<div class="bar">
+  <button id="pause">Pause</button>
+  <button id="reset">Reset</button>
+  <button id="mute">Sound on</button>
+  <button id="fs">Fullscreen</button>
+  <label><button id="load" type="button">Load another ROM…</button><input id="file" type="file" accept=".nes" hidden></label>
+  <a href="./tunnel-iv.nes" download><button type="button">Download .nes</button></a>
+</div>
+<dl class="keys">
+  <dt><kbd>←</kbd> <kbd>→</kbd></dt><dd>steer across the road</dd>
+  <dt><kbd>↑</kbd> <kbd>Space</kbd> <kbd>Z</kbd> <kbd>X</kbd></dt><dd>sound the horn (up, A, B)</dd>
+  <dt><kbd>Enter</kbd> <kbd>P</kbd></dt><dd>roll out / pause (start)</dd>
+  <dt><kbd>Shift</kbd></dt><dd>the band on or off (select)</dd>
+  <dt><kbd>M</kbd></dt><dd>mute</dd>
+</dl>
+<div class="pad" id="pad">
+  <div class="grp"><span></span><button data-b="UP">▲</button><span></span><button data-b="LEFT">◀</button><span></span><button data-b="RIGHT">▶</button><span></span><button data-b="DOWN">▼</button><span></span></div>
+  <div class="grp"><span></span><button data-b="START">START</button><span></span><button data-b="B">B</button><span></span><button data-b="A">A</button><span></span><button data-b="SELECT">SEL</button><span></span></div>
+</div>
+<p class="note">Source for the ROM lives in <code>nes/</code> (6502 assembly for cc65, MMC3, a four-channel APU arrangement of the song). Rebuild with <code>nes/build.sh</code>.</p>
+<script type="module" src="/src/nes/player.js"></script>
+</body>
+</html>
