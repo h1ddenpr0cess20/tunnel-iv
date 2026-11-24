@@ -48,6 +48,7 @@ def to_levels(im, lo=0.18, hi=0.55):
     lv = np.where(lum < lo, 1, np.where(lum < hi, 2, 3))
     return np.where(im[..., 3] > 0.45, lv, 0).astype(np.uint8)
 
+MAX_W = 56               # 7 sprites: a line holds 8, and the marker rod has one
 ROBOT = ('dig_', 'walk', 'leap')
 ROBOT_SCALE = 1.2         # robots drawn a bit bigger than life, so they read at a distance
 
@@ -85,6 +86,12 @@ def sprite(name, b):
     lv = bold(sm) if robot else to_levels(sm)
     if name == 'mound':
         lv = heap(lv)
+        if lv.shape[1] > MAX_W:              # a drift is wide: squeezed to what a line of sprites can hold
+            ys, xs = np.nonzero(lv)
+            lv = lv[:, xs.min():xs.max() + 1]
+            idx = (np.arange(MAX_W) * lv.shape[1] / MAX_W).astype(int)
+            lv = lv[:, idx]
+            sm = sm[:, :MAX_W]
     ys, xs = np.nonzero(lv)
     if len(ys) == 0:
         return None

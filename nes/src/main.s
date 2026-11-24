@@ -73,6 +73,7 @@ qx: .res 1
 rr: .res 1
 lastn: .res 1
 lagn: .res 1
+ystep: .res 1
 dq: .res 1
 dxa: .res 1
 dxs: .res 1
@@ -521,8 +522,8 @@ panel:
 q_open:                    ; C clear: room (X = where); C set: no room this frame
   pha
   ldx q_rd                 ; drained: start again from the top (only here, never in the NMI, which
-  cpx q_wr                 ; could land while an entry is being filled)
-  bne :+
+  cpx q_wr                 ; could land while an entry is being filled); q_wr first, so an NMI
+  bne :+                   ; between the two sees q_rd ahead and leaves the queue alone
   ldx #0
   stx q_wr
   stx q_rd
@@ -590,9 +591,9 @@ nmi:
   lda #40
   sta qbud
 @q:
-  lda q_rd
+  lda q_rd                 ; (only while behind: q_open resets q_wr before q_rd)
   cmp q_wr
-  beq @qempty
+  bcs @qempty
   lda qbud
   bmi @qdone
   tax

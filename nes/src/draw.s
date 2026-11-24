@@ -862,7 +862,23 @@ emit_parts:                ; X = which prepared thing: its sprites into OAM
   sta sx_+1
   lda d_sy,x
   sta sy_
-  ldy d_y,x
+  ; every other frame its sprites go in from the other end, so where a line has too many, the ones
+  ; left off take turns
+  lda #0
+  sta ystep
+  lda frame
+  lsr a
+  lda d_y,x
+  bcc :+
+  lda t2                   ; from the last: y = start + 3n + 3, stepping back 6 (3 read, 6 back)
+  asl a
+  adc t2
+  adc #3
+  clc
+  adc d_y,x
+  ldy #<-6
+  sty ystep
+: tay
 @p:
   ldx oamn
   lda t3
@@ -871,6 +887,10 @@ emit_parts:                ; X = which prepared thing: its sprites into OAM
   lda t2
   beq @pd
   dec t2
+  tya
+  clc
+  adc ystep
+  tay
   cpx #0
   beq @pd                  ; the sprites are all used
   lda (ptr),y              ; dx
@@ -926,6 +946,10 @@ emit_parts:                ; X = which prepared thing: its sprites into OAM
   lda t2
   beq @pd
   dec t2
+  tya
+  clc
+  adc ystep
+  tay
   cpx #0
   beq @pd
   lda (ptr),y
