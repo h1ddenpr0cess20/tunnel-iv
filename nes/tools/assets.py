@@ -391,7 +391,9 @@ def emit(NT, banks, meta, R1_GAME, R1_TITLE, SKY0, groups, cab_banks, dim, big, 
     E('DEATH_STR: .word ' + ','.join(f'STR_D_{k}' if k in T.DEATH else 'STR_D_robot' for k in KINDS))
     # HUD labels (dim) on the roof row 0.
     dmap = {ch: 128 + i for ch, i in dim.items()}
-    lab = [dmap.get(ch, cmap[' ']) if ch != ' ' else cmap[' '] for ch in ' DISTANCE PLOWED        NEXT EXIT ']
+    labels = ' DISTANCE PLOWED      NEXT EXIT '
+    assert len(labels) == 32
+    lab = [dmap.get(ch, cmap[' ']) if ch != ' ' else cmap[' '] for ch in labels]
     byt('HUD_LABELS', lab)
     E(f'T_SPACE = {cmap[" "]}')
     E(f'T_0 = {cmap["0"]}')
