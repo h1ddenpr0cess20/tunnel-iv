@@ -670,19 +670,23 @@ sfx_horn:
   sta s_pt
   rts
 
-pulse_sweep:               ; A = rate, X/Y = start period lo/hi, snd_t0 = frames
+pulse_sweep:               ; A = rate, X/Y = start period lo/hi, sfx_len = frames
   sta s_pk
   stx s_pper
   sty s_pper+1
-  lda snd_t0
+  lda sfx_len
   sta s_pt
+  ldx sfx_sx               ; (the caller's X and Y back)
+  ldy sfx_sy
   rts
 
 sfx_servo:
+  stx sfx_sx
+  sty sfx_sy
   lda s_pt
   bne :+
   lda #18
-  sta snd_t0
+  sta sfx_len
   ldx #<400
   ldy #>400
   lda #12
@@ -690,18 +694,22 @@ sfx_servo:
 : rts
 
 sfx_leap:
+  stx sfx_sx
+  sty sfx_sy
   lda #24
-  sta snd_t0
+  sta sfx_len
   ldx #<600
   ldy #>600
   lda #16
   jmp pulse_sweep
 
 sfx_chime:
+  stx sfx_sx
+  sty sfx_sy
   lda s_pt
   bne :+
   lda #30
-  sta snd_t0
+  sta sfx_len
   ldx #<120
   ldy #>120
   lda #0
@@ -714,9 +722,13 @@ noise_fx:                  ; A = frames, X = period, Y = loudness x 2
   sty s_nv
   lda #0
   sta s_nk
+  ldx sfx_sx               ; (the caller's X and Y back)
+  ldy sfx_sy
   rts
 
 sfx_crash:
+  stx sfx_sx
+  sty sfx_sy
   lda #0
   sta mus_on
   lda #90
@@ -728,18 +740,24 @@ sfx_crash:
   rts
 
 sfx_plow:
+  stx sfx_sx
+  sty sfx_sy
   lda #26
   ldx #10
   ldy #28
   jmp noise_fx
 
 sfx_scrape:
+  stx sfx_sx
+  sty sfx_sy
   lda #20
   ldx #3
   ldy #18
   jmp noise_fx
 
 sfx_whoosh:
+  stx sfx_sx
+  sty sfx_sy
   lda s_nt
   bne :+
   lda #22

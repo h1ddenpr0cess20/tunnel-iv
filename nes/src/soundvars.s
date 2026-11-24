@@ -2,6 +2,9 @@
 snd_t0: .res 1
 snd_t1: .res 1
 snd_ptr: .res 2
+sfx_sx: .res 1
+sfx_sy: .res 1
+sfx_len: .res 1
 ; ---- sound (zero page)
 mus_on: .res 1
 muted: .res 1

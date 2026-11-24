@@ -952,6 +952,11 @@ hits:
 : cmp #K_JACK
   bne :+
   jsr hit_jack
+  lda state                ; crashed into it: done
+  cmp #1
+  beq @nj
+  rts
+@nj:
   jmp @next
 : ; in reach along the road? -2.2 - hd < z < 2.7 + hd (hd = w: things are about as deep as wide, cars deeper)
   lda o_k,x
@@ -1017,9 +1022,10 @@ hits:
   sta shake
 @next:
   dex
-  bmi :+
+  bmi @out
   jmp @l
-: rts
+@out:
+  rts
 @hit:
   lda o_k,x
   jmp die
