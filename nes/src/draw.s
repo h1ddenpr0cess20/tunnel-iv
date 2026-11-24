@@ -1074,7 +1074,10 @@ pick_view:                 ; -> A = view, t3 = $40 if flipped, t4 = animation fr
   inc t4
 : lda #V_WALK
   rts
-@leap:
+@leap:                     ; (its picture faces the other way to the walker's)
+  lda t3
+  eor #$40
+  sta t3
   lda #V_LEAP
   rts
 @car:
@@ -1102,7 +1105,10 @@ pick_view:                 ; -> A = view, t3 = $40 if flipped, t4 = animation fr
 @buried:
   lda #V_BURIED
   rts
-@semi:
+@semi:                     ; (its picture is of one jackknifed the other way)
+  lda t3
+  eor #$40
+  sta t3
   lda #V_SEMI
   rts
 @tire:
