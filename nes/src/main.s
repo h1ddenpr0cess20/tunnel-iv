@@ -74,6 +74,8 @@ rr: .res 1
 lastn: .res 1
 lagn: .res 1
 ystep: .res 1
+rotb: .res 1
+rote: .res 1
 dq: .res 1
 dxa: .res 1
 dxs: .res 1
@@ -229,8 +231,14 @@ main:
   beq :+
   jsr sound_toggle
 : jsr build_scroll
-  jsr build_oam
-  jsr hud_update
+  lda lagn                 ; catching up a step: the sprites stay as they were this once, so the
+  cmp #2                   ; extra step doesn't make this frame late too
+  bcc :+
+  lda state
+  cmp #1
+  beq :++
+: jsr build_oam
+: jsr hud_update
   jmp main
 
 wait_nmi:
@@ -749,7 +757,7 @@ init_lists:                ; both buffers (entries at 0 and at 16)
 
 INIT_PAL:
   .byte $0F,$00,$10,$30, $0F,$00,$10,$30, $0F,$00,$10,$30, $0F,$00,$10,$30
-  .byte $0F,$0F,$00,$30, $0F,$00,$10,$30, $0F,$10,$10,$30, $0F,$10,$30,$30
+  .byte $0F,$0F,$00,$30, $0F,$0F,$10,$30, $0F,$00,$10,$30, $0F,$10,$30,$30
 
 .include "game.s"
 .include "draw.s"

@@ -277,58 +277,31 @@ build_oam:
   cmp #3
   bne @pil0
 @panel:
-  lda #$F0                 ; everything off first (no snow drawn would leave oamn at 0: 'full')
+  lda #$F0                 ; everything off first
 : sta oam,x
   inx
   inx
   inx
   inx
   bne :-
-  stx oamn
   stx sprbn
   stx sprbn+1
   stx sprbn+2
+  lda #4                   ; (slot 0 stays hidden: oamn 0 means full)
+  sta oamn
   jsr draw_snow
   jmp @rest
 @pil0:
-  ; the marker rod on the blade's left end
-  lda #91
-  sta oam,x
-  lda #SPT_ROD_TOP
-  sta oam+1,x
-  lda #0
-  sta oam+2,x
-  lda #50
-  sta oam+3,x
-  inx
-  inx
-  inx
-  inx
-  lda #107
-@rod:
-  sta oam,x
-  pha
-  lda #SPT_ROD
-  sta oam+1,x
-  lda #0
-  sta oam+2,x
-  lda #50
-  sta oam+3,x
-  inx
-  inx
-  inx
-  inx
-  pla
-  clc
-  adc #16
-  cmp #185
-  bcc @rod
-  stx oamn
+  lda #$F0
+  sta oam
+  lda #4
+  sta oamn
   lda #0
   sta sprbn
   sta sprbn+1
   sta sprbn+2
-  jsr draw_things
+  jsr draw_things          ; the things on the road first: where a line has more than eight, the
+  jsr draw_rod             ; rod, posts and snow are the ones that drop out
   jsr draw_posts
   jsr draw_snow
 @rest:                     ; the rest off screen
@@ -410,12 +383,14 @@ draw_things:
   bcc @d
   dex
   stx t5
-  lda frame
+  inc rotb                 ; a counter kept under n - 1 (one step a frame)
+  lda rotb
 : cmp t5
   bcc :+
   sbc t5
   jmp :-
-: sta rr                   ; rotation of entries 1..n-1
+: sta rotb
+  sta rr                   ; rotation of entries 1..n-1
 @d:
   lda di
   cmp SORTN
@@ -449,12 +424,14 @@ draw_things:
   ; line they take turns
   lda dn
   beq @done
-  lda frame
+  inc rote                 ; likewise kept under dn
+  lda rote
 : cmp dn
   bcc :+
   sbc dn
   jmp :-
-: sta di
+: sta rote
+  sta di
   lda dn
   sta t5
 @e:
@@ -683,7 +660,25 @@ draw_one:
   rts
 : ; sy = the road at that depth, less its height off it (o_y in 1/16 m), less a bank under walkers
   ldy dq
-  lda ZGY,y
+  lda o_k,x
+  cmp #K_JACK              ; the semi: sized for its middle, but its near wheels are on the road
+  bne :++                  ; at its near end
+  lda o_zh,x
+  clc
+  adc #1
+  cmp #32
+  bcs :+
+  asl a
+  asl a
+  tay
+  jmp :++
+: sec
+  sbc #32
+  asl a
+  clc
+  adc #128
+  tay
+: lda ZGY,y
   sta sy_
   jsr height_of
   beq :+
@@ -794,26 +789,24 @@ draw_one:
   sta t2                   ; how many
   iny
   sty ry
-  ; palette: fog by depth (snow heaps a step lighter)
+  ; palette: fog by depth, kept dark enough to read on the white road (snow heaps a step lighter
+  ; once they're off a way)
   ldx oi
   lda o_zh,x
   ldy #0
-  cmp #20
-  bcc :+
-  iny
   cmp #34
   bcc :+
   iny
-  cmp #56
+  cmp #60
   bcc :+
   iny
 : lda o_k,x
   cmp #K_DRIFT
-  beq @lt
-  cmp #K_BURIED
   bne @pal
-@lt:
-  cpy #3
+  lda o_zh,x
+  cmp #20
+  bcc @pal
+  cpy #2
   bcs @pal
   iny
 @pal:
@@ -957,11 +950,11 @@ emit_parts:                ; X = which prepared thing: its sprites into OAM
   eor #$FF
   sec
   sbc #7                   ; -dx - 8
-  php
+  sta t4
   clc
   adc sx_
   sta t0
-  plp
+  lda t4                   ; (the carry from that add kept)
   bmi @fneg
   lda sx_+1
   adc #0
@@ -1064,10 +1057,13 @@ pick_view:                 ; -> A = view, t3 = $40 if flipped, t4 = animation fr
   lsr a
   and #1
   sta t4
+  lda o_zh,x               ; far off, side on reads as a squiggle: stood up
+  cmp #24
+  bcs :+
   lda o_f,x
   and #$40
-  beq :+
-  lda #V_DIG_FRONT
+  beq :++
+: lda #V_DIG_FRONT
   rts
 : lda #V_DIG_SIDE
   rts
@@ -1120,6 +1116,42 @@ pick_view:                 ; -> A = view, t3 = $40 if flipped, t4 = animation fr
 SLOT_BASE: .byte 64, 128, 192
 SPIN_VIEW: .byte V_CAR_LIGHT, V_SPIN45, V_SPIN90, V_SPIN135, V_SPIN180, V_SPIN135, V_SPIN90, V_SPIN45
 SPIN_FLIP: .byte 0, 0, 0, 0, 0, $40, $40, $40
+
+; the marker rod on the blade's left end (after the things on the road, so it's what flickers)
+draw_rod:
+  ldx oamn
+  beq @r
+  lda #91
+  ldy #SPT_ROD_TOP
+@p:
+  sta oam,x
+  pha
+  tya
+  sta oam+1,x
+  lda #0
+  sta oam+2,x
+  lda #50
+  sta oam+3,x
+  inx
+  inx
+  inx
+  inx
+  pla
+  beq @full                ; (x wrapped: OAM full)
+  cpx #0
+  beq @full
+  clc
+  adc #16
+  ldy #SPT_ROD
+  cmp #185
+  bcc @p
+  stx oamn
+@r:
+  rts
+@full:
+  ldx #0
+  stx oamn
+  rts
 
 ; ---- the reflector posts, both sides, every 30 m
 draw_posts:
@@ -1182,8 +1214,8 @@ draw_posts:
   rts
 
 POST_T:
-  .byte SPT_POST_H2, SPT_POST_H2, SPT_POST_H2, SPT_POST_H3, SPT_POST_H4, SPT_POST_H4, SPT_POST_H6, SPT_POST_H6
-  .byte SPT_POST_H8, SPT_POST_H8, SPT_POST_H10, SPT_POST_H10, SPT_POST_H10, SPT_POST_H13, SPT_POST_H13, SPT_POST_H13
+  .byte SPT_POST_H2, SPT_POST_H2, SPT_POST_H2, SPT_POST_H2, SPT_POST_H4, SPT_POST_H4, SPT_POST_H6, SPT_POST_H6
+  .byte SPT_POST_H6, SPT_POST_H9, SPT_POST_H9, SPT_POST_H9, SPT_POST_H12, SPT_POST_H12, SPT_POST_H12, SPT_POST_H12
   .byte SPT_POST_H16
 post_at:                   ; t0:t1 = x + 0.55 m (8.8); ppmh, sy_ set
   lda t0

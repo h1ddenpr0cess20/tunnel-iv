@@ -50,7 +50,8 @@ def to_levels(im, lo=0.18, hi=0.55):
 
 MAX_W = 56               # 7 sprites: a line holds 8, and the marker rod has one
 ROBOT = ('dig_', 'walk', 'leap')
-ROBOT_SCALE = 1.2         # robots drawn a bit bigger than life, so they read at a distance
+ROBOT_SCALE = 1.2        # robots drawn a bit bigger than life, so they read at a distance
+FAR_BOOST = [1.0, 1.0, 1.1, 1.25, 1.45, 1.65, 1.85, 2.0]   # far things drawn bigger, to read on 256 pixels
 
 def bold(im):
     """A robot: a dark silhouette (thin limbs kept, thickened a pixel when small), lit edges mid grey."""
@@ -62,6 +63,14 @@ def bold(im):
     lv = np.where(lum > 0.62, 2, 1)
     lv = np.where(a > 0.22, lv, 1)
     return np.where(on, lv, 0).astype(np.uint8)
+
+def outline(lv):
+    """A dark rim round a car, truck or tire, so white paint stands off white snow."""
+    on = np.pad(lv > 0, 1)
+    inner = on[1:-1, 1:-1] & on[:-2, 1:-1] & on[2:, 1:-1] & on[1:-1, :-2] & on[1:-1, 2:]
+    out = lv.copy()
+    out[(lv > 0) & ~inner] = 1
+    return out
 
 def heap(lv):
     """A snow heap: white on top, its shadowed underside and rim grey, so it stands off the white road."""
@@ -81,9 +90,11 @@ def heap(lv):
 def sprite(name, b):
     im = load(name)
     robot = name.startswith(ROBOT)
-    k = (F / ZB[b]) / (256.0 / SPAN[name]) * (ROBOT_SCALE if robot else 1)
+    k = (F / ZB[b]) / (256.0 / SPAN[name]) * (ROBOT_SCALE if robot else 1) * (1 if name.startswith('semi') else FAR_BOOST[b])
     sm = shrink(im, k)
     lv = bold(sm) if robot else to_levels(sm)
+    if not robot and name != 'mound':
+        lv = outline(lv)
     if name == 'mound':
         lv = heap(lv)
         if lv.shape[1] > MAX_W:              # a drift is wide: squeezed to what a line of sprites can hold
@@ -102,18 +113,24 @@ def sprite(name, b):
     return lv[y0:ay, x0:x1], x0 - ax, y0 - ay       # pixels, offset of their top left from the anchor
 
 def metasprite(px, ox, oy):
-    """Cut into 8x16 tiles on a grid from the top left; empty tiles dropped."""
+    """Cut into 8x16 tiles, as few as cover it: bands of 16 rows up from the bottom, and in each band
+    tiles laid from the leftmost pixel not yet covered (so not on a grid), empty ones never made."""
     h, w = px.shape
-    H, W = -(-h // 16) * 16, -(-w // 8) * 8
-    pad = np.zeros((H, W), np.uint8)
+    H = -(-h // 16) * 16
+    pad = np.zeros((H, w + 8), np.uint8)
     pad[H - h:, :w] = px                     # bottom-aligned, so it stands on the anchor
     oy -= H - h
     parts = []
     for r in range(H // 16):
-        for c in range(W // 8):
-            t = pad[r * 16:r * 16 + 16, c * 8:c * 8 + 8]
-            if t.any():
-                parts.append((int(round(ox)) + c * 8, int(round(oy)) + r * 16, t))
+        band = pad[r * 16:r * 16 + 16]
+        cols = np.nonzero(band.any(axis=0))[0]
+        x = 0
+        for c in cols:
+            if c < x:
+                continue
+            t = band[:, c:c + 8]
+            parts.append((int(round(ox)) + int(c), int(round(oy)) + r * 16, t.copy()))
+            x = c + 8
     return parts
 
 if __name__ == '__main__':
@@ -132,7 +149,7 @@ if __name__ == '__main__':
 
 # ---------------------------------------------------------------- packing
 CAPS = {'semi': range(3, 8), 'spin45': range(1, 8), 'spin90': range(1, 8), 'spin135': range(1, 8), 'spin180': range(1, 8)}
-COMMON_FROM = 6          # buckets from here on (48 m and further) live in the always-loaded bank
+COMMON_FROM = 7          # buckets from here on (48 m and further) live in the always-loaded bank
 
 def tile16(t):
     """8x16 of 0..3 -> 32 bytes (two 8x8 tiles, NES planar)."""
@@ -143,7 +160,7 @@ def tile16(t):
         out += p0 + p1
     return out
 
-POST_H = [2, 3, 4, 6, 8, 10, 13, 16]   # reflector post heights in px
+POST_H = [2, 4, 6, 9, 12, 16]   # reflector post heights in px
 
 def flakes_and_fittings():
     """Tiles that are always there: snowflakes and streaks, reflector posts, the marker rod, the pillar, a glow."""
@@ -196,7 +213,7 @@ def build():
             for cname in caps:
                 s = sprite(cname, b)
                 frames.append(metasprite(*s) if s else [])
-            if b == 7 and views[view].get(6) is not None:
+            if b == 7 and COMMON_FROM < 7 and views[view].get(6) is not None:
                 views[view][b] = views[view][6]           # the smallest: as at 48 m
                 continue
             if b >= COMMON_FROM and view.startswith('spin'):
