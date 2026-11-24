@@ -107,3 +107,38 @@ blizzard howling round the cab, the air horn and the wipers.
 - `src/main.js`: the frame loop
 - `src/input.js`, `src/hud.js`, `src/sound.js`: controls, HUD, the band and the truck
 - `src/constants.js`, `src/math.js`: shared numbers and helpers
+
+## Demastered (NES)
+
+`nes/` is a port to the NES: the same highway, storm and band, in four
+greys. `nes/tunnel-iv.nes` is a 288 KB MMC3 cartridge (iNES mapper 4,
+32 KB PRG, 256 KB CHR) for any emulator or flash cart; `nes.html` plays it
+in the browser (`npm run dev`, then `/nes.html`).
+
+Controls: left/right (or A/D) to steer, up, Z or Space (A) and X (B) to
+sound the horn, Enter (Start) to roll out and pause, Shift (Select) to turn
+the sound off and on, M to mute the page.
+
+How it fits on the machine:
+
+- The storm is 16 looping frames of the original's ink swirl, rendered,
+  dithered to the NES's four greys and swapped in by CHR bank each frame.
+- The road is a 512-pixel-wide picture across both nametables. A scanline
+  IRQ shears it row by row, a different scroll for every 8 lines, for
+  steering and bends; its ruts and bare patches run by switching CHR banks.
+- Robots, cars, the semi, tires and drifts are the remastered game's models,
+  captured and cut into 8x16 sprites at eight distances. The far ones live in
+  an always-loaded bank, the rest in three banks picked each frame, nearest
+  first; past eight sprites on a line, or three banks, things take turns.
+- The band is "Whiteout on the Highway" from `src/sound.js`, arranged by
+  `nes/tools/music.py`: lead and twin/rhythm on the pulses, bass on the
+  triangle, the kit on noise.
+
+Building needs Python 3 with numpy and Pillow, and cc65 (`ca65`, `ld65`):
+
+```sh
+cd nes && ./build.sh   # -> nes/tunnel-iv.nes, copied to public/
+```
+
+`nes/tools/capture/` re-renders the model captures in `nes/models/` from the
+remastered game (only needed if the models change).
