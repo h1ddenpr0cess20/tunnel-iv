@@ -1,4 +1,7 @@
 .segment "ZEROPAGE"
+snd_t0: .res 1
+snd_t1: .res 1
+snd_ptr: .res 2
 ; ---- sound (zero page)
 mus_on: .res 1
 muted: .res 1

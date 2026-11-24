@@ -71,6 +71,8 @@ qt: .res 1
 qy: .res 1
 qx: .res 1
 rr: .res 1
+lastn: .res 1
+lagn: .res 1
 dq: .res 1
 dxa: .res 1
 dxs: .res 1
@@ -172,6 +174,12 @@ reset:
 
 main:
   jsr wait_nmi
+  lda nmi_cnt              ; vblanks since the last time round (2 when the last frame ran long)
+  sec
+  sbc lastn
+  sta lagn
+  lda nmi_cnt
+  sta lastn
   inc frame
   jsr read_pad
   jsr rand
@@ -193,7 +201,21 @@ main:
 : lda paused
   beq :+
   jmp main
-: jsr game_update
+:  lda lagn                 ; a frame was dropped: catch the game up a step, so it keeps its speed
+  cmp #2
+  bcc @step
+  lda padn
+  pha
+  lda #0
+  sta padn
+  jsr game_update
+  pla
+  sta padn
+  lda state
+  cmp #1
+  bne @draw
+@step:
+  jsr game_update
   jmp @draw
 @dying:
   jsr dying_update
@@ -498,7 +520,13 @@ panel:
 ; queue a run: A = len, ptr2 = PPU address; then call q_byte len times. Returns X = write index.
 q_open:                    ; C clear: room (X = where); C set: no room this frame
   pha
-  clc
+  ldx q_rd                 ; drained: start again from the top (only here, never in the NMI, which
+  cpx q_wr                 ; could land while an entry is being filled)
+  bne :+
+  ldx #0
+  stx q_wr
+  stx q_rd
+: clc
   adc q_wr
   adc #3
   bcs @full
@@ -591,9 +619,6 @@ nmi:
   sta qbud
   jmp @q
 @qempty:
-  lda #0
-  sta q_rd
-  sta q_wr
 @qdone:
   lda PPUSTAT
   lda #0

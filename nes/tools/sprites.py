@@ -48,11 +48,43 @@ def to_levels(im, lo=0.18, hi=0.55):
     lv = np.where(lum < lo, 1, np.where(lum < hi, 2, 3))
     return np.where(im[..., 3] > 0.45, lv, 0).astype(np.uint8)
 
+ROBOT = ('dig_', 'walk', 'leap')
+ROBOT_SCALE = 1.2         # robots drawn a bit bigger than life, so they read at a distance
+
+def bold(im):
+    """A robot: a dark silhouette (thin limbs kept, thickened a pixel when small), lit edges mid grey."""
+    a = im[..., 3]
+    lum = im[..., 0] * 0.3 + im[..., 1] * 0.59 + im[..., 2] * 0.11
+    on = a > 0.22
+    if im.shape[0] < 40:                     # small: thicken sideways so limbs survive
+        on = on | np.roll(on, 1, axis=1)
+    lv = np.where(lum > 0.62, 2, 1)
+    lv = np.where(a > 0.22, lv, 1)
+    return np.where(on, lv, 0).astype(np.uint8)
+
+def heap(lv):
+    """A snow heap: white on top, its shadowed underside and rim grey, so it stands off the white road."""
+    on = lv > 0
+    h = on.shape[0]
+    rows = np.nonzero(on.any(axis=1))[0]
+    out = np.where(on, 3, 0).astype(np.uint8)
+    if len(rows) == 0:
+        return out
+    top, bot = rows.min(), rows.max()
+    cut = top + max(1, int(round((bot - top + 1) * 0.6)))
+    out[cut:][on[cut:]] = 2
+    edge = on & ~(np.roll(on, 1, 0) & np.roll(on, -1, 0) & np.roll(on, 1, 1) & np.roll(on, -1, 1))
+    out[edge] = 2
+    return out
+
 def sprite(name, b):
     im = load(name)
-    k = (F / ZB[b]) / (256.0 / SPAN[name])
+    robot = name.startswith(ROBOT)
+    k = (F / ZB[b]) / (256.0 / SPAN[name]) * (ROBOT_SCALE if robot else 1)
     sm = shrink(im, k)
-    lv = to_levels(sm)
+    lv = bold(sm) if robot else to_levels(sm)
+    if name == 'mound':
+        lv = heap(lv)
     ys, xs = np.nonzero(lv)
     if len(ys) == 0:
         return None
@@ -104,6 +136,8 @@ def tile16(t):
         out += p0 + p1
     return out
 
+POST_H = [2, 3, 4, 6, 8, 10, 13, 16]   # reflector post heights in px
+
 def flakes_and_fittings():
     """Tiles that are always there: snowflakes and streaks, reflector posts, the marker rod, the pillar, a glow."""
     T = {}
@@ -119,8 +153,11 @@ def flakes_and_fittings():
             x = min(x, 7); y = min(y, 15)
         T[name] = t
     t = blank(); t[:, 3] = 1; T['post'] = t                      # a post: a dark line ...
-    t = blank(); t[3:, 3] = 1; t[0:3, 2:5] = 3; T['post_top'] = t  # ... the reflector on its top
-    t = blank(); t[0:2, 3:5] = 3; t[2:, 3] = 1; T['post_top_s'] = t
+    for h in POST_H:                                             # ... or a short one standing on the
+        t = blank(); t[16 - h:, 3] = 1                           # tile's bottom, its reflector on top
+        if h >= 8: t[16 - h:18 - h, 2:5] = 3
+        elif h >= 4: t[16 - h:17 - h, 3:5] = 3
+        T[f'post_h{h}'] = t
     t = blank(); t[:, 2] = 1; t[:, 3] = 2; T['rod'] = t
     t = blank(); t[4:, 2] = 1; t[4:, 3] = 2; t[0:4, 1:5] = 3; t[0, 1] = t[0, 4] = t[3, 1] = t[3, 4] = 0; T['rod_top'] = t
     t = np.ones((16, 8), np.uint8); T['pillar'] = t
@@ -139,10 +176,11 @@ def build():
     fixed = {k: put(common, v, 32) for k, v in fit.items()}
     views = {}
     dyn = []                        # dynamic banks: lists of tiles
+    groups = []                     # (view, [buckets], [frames per bucket]) packed together in one bank
     for view, caps, bs in VIEWS:
         bs = CAPS.get(view, bs)
         views[view] = {}
-        cur = None
+        pend = {}
         for b in range(8):
             if b not in bs:
                 views[view][b] = None
@@ -162,13 +200,37 @@ def build():
                 recs = [[(dx, dy, put(common, t, 32)) for dx, dy, t in fr] for fr in frames]
                 views[view][b] = ('common', recs)
                 continue
-            need = sum(len(fr) for fr in frames)
-            if need > 32:                     # too big to animate: hold the first frame
-                frames = [frames[0]] * len(frames); need = len(frames[0])
-            if cur is None or len(dyn[cur]) + need > 32:
-                dyn.append([]); cur = len(dyn) - 1
-            recs = [[(dx, dy, put(dyn[cur], t, 32)) for dx, dy, t in fr] for fr in frames]
-            views[view][b] = (cur, recs)
+            if sum(len(fr) for fr in frames) > 32:        # too big to animate: hold the first frame
+                frames = [frames[0]] * len(frames)
+            pend[b] = frames
+        # the near ones each on their own; 12 m and further together, so one bank covers the middle distance
+        size = lambda bl: len(set(tile16(t) for b in bl for fr in pend[b] for _, _, t in fr))
+        cur = []
+        for b in sorted(pend):
+            if b < 2:
+                groups.append((view, [b])); continue
+            if cur and size(cur + [b]) > 32:
+                groups.append((view, cur)); cur = []
+            cur.append(b)
+        if cur: groups.append((view, cur))
+        views[view]['_pend'] = pend
+    def fits(bank, view, bl):
+        trial = list(bank)
+        for b in bl:
+            for fr in views[view]['_pend'][b]:
+                for _, _, t in fr:
+                    tb = tile16(t)
+                    if tb not in trial: trial.append(tb)
+        return len(trial) <= 32
+    for view, bl in groups:                     # first fit
+        for i, bank in enumerate(dyn):
+            if fits(bank, view, bl): break
+        else:
+            dyn.append([]); i = len(dyn) - 1
+        for b in bl:
+            frames = views[view]['_pend'][b]
+            views[view][b] = (i, [[(dx, dy, put(dyn[i], t, 32)) for dx, dy, t in fr] for fr in frames])
+    for view in views: views[view].pop('_pend', None)
     print(f'sprites: {len(common)} common tiles, {len(dyn)} banks of the rest ({sum(map(len, dyn))} tiles)')
     pad = lambda lst, n: b''.join(lst) + bytes(32 * (n - len(lst)))
     banks = [pad(common, 32)] + [pad(d, 32) for d in dyn]

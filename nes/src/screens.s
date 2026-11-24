@@ -96,18 +96,27 @@ put_big:                   ; a big string: row, col, n, top tiles, bottom tiles
   sty t5
   rts
 
-put_buf:                   ; lexbuf (A = length) at row A?, col X -- (row in A, col in X, length in t2)
+put_buf:                   ; lexbuf at row A, col X, length t2 (rendering off); a tile at a time, as
+  sta t3                   ; road rows run on from one nametable into the other
+  stx t4
+  ldx #0
+@c:
+  stx t5
+  lda PPUSTAT
+  lda t3
+  ldx t4
   jsr scr_addr
   lda ptr2+1
   sta PPUADDR
   lda ptr2
   sta PPUADDR
-  ldx #0
-: lda lexbuf,x
+  ldx t5
+  lda lexbuf,x
   sta PPUDATA
+  inc t4
   inx
   cpx t2
-  bne :-
+  bne @c
   rts
 
 go_over:
@@ -173,6 +182,16 @@ go_over:
   tax
   lda #15
   jsr put_buf
+  lda #<STR_OVER1
+  sta ptr
+  lda #>STR_OVER1
+  sta ptr+1
+  jsr put_str
+  lda #<STR_OVER2
+  sta ptr
+  lda #>STR_OVER2
+  sta ptr+1
+  jsr put_str
   lda #<STR_GO
   sta ptr
   lda #>STR_GO

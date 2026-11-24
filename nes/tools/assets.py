@@ -62,6 +62,10 @@ def wall_row():
     img = frost(img, e, ys, xs)
     return np.where(e > 0, img, 0.03)
 
+def road_tone(img):
+    """Snow reads white, as in the original: packed snow ~0.75 goes near white, the ruts to the light grey."""
+    return np.clip(0.72 + (img - 0.55) * 1.12, 0, 1)
+
 def road_rows(ph, y0, y1):
     """The 512-wide road picture rows y0..y1 (screen x = picture x - 128 when you're in the middle)."""
     return Q.ss_render(R.scene, -128, 384, y0, y1, ss=2, dash_ph=ph * R.DASH, storm_on=False)
@@ -215,7 +219,7 @@ def main():
     road_ph = {}
     nph_max = max(g[2] for g in ROAD_GROUPS)
     for p in range(nph_max):
-        img = road_rows(p / nph_max, 104, 192)
+        img = road_tone(road_rows(p / nph_max, 104, 192))
         road_ph[p] = Q.quant(img, 0, 104)
         print('road phase', p, flush=True)
     groups = []
@@ -367,6 +371,8 @@ def emit(NT, banks, meta, R1_GAME, R1_TITLE, SKY0, groups, cab_banks, dim, big, 
         byt(f'STR_BIG{i}', [row, col, len(tl)] + tl + bl)
     string('STR_BEST', *T.BEST)
     string('STR_OVER', *T.OVER[0])
+    string('STR_OVER1', *T.OVER[1])
+    string('STR_OVER2', *T.OVER[2])
     string('STR_PAUSE0', *T.PAUSED[0])
     string('STR_PAUSE1', *T.PAUSED[1])
     string('STR_GO', *T.GO)

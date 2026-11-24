@@ -12,7 +12,7 @@ TITLE = [
 ]
 TITLE_BIG = (6, 'neverending'), (8, 'tunnel iv')
 BEST = (23, 7, 'Your best:')       # + the number
-OVER = [(7, None, 'off the road')]
+OVER = [(7, None, 'off the road'), (11, None, 'distance plowed'), (14, None, 'next exit')]
 PAUSED = [(12, None, 'paused'), (14, None, 'PRESS START TO KEEP DRIVING')]
 GO = (21, None, 'PRESS START: BACK ON THE ROAD')
 MILESTONES = [(150, 'the road is yours'), (450, 'visibility: zero'), (900, 'keep it between the posts'),

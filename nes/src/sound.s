@@ -55,10 +55,10 @@ load_bar:                  ; the patterns for bar mbar
 @c:
   ldy mbar
   lda ORDLO,x
-  sta ptr2
+  sta snd_ptr
   lda ORDHI,x
-  sta ptr2+1
-  lda (ptr2),y
+  sta snd_ptr+1
+  lda (snd_ptr),y
   tay
   txa
   asl a
@@ -81,9 +81,9 @@ ORDLO: .byte <ORD0, <ORD1, <ORD2, <ORD3
 ORDHI: .byte >ORD0, >ORD1, >ORD2, >ORD3
 
 sound_update:
-  lda ptr2                 ; (the NMI may land in the middle of the main loop's use of these)
+  lda snd_ptr              ; (its own temps: the NMI lands anywhere in the main loop)
   pha
-  lda ptr2+1
+  lda snd_ptr+1
   pha
   lda paused
   bne @silent
@@ -110,9 +110,9 @@ sound_update:
 @sfx:
   jsr sfx_frame
   pla
-  sta ptr2+1
+  sta snd_ptr+1
   pla
-  sta ptr2
+  sta snd_ptr
   rts
 @silent:
   lda #$30
@@ -122,9 +122,9 @@ sound_update:
   lda #$80
   sta $4008
   pla
-  sta ptr2+1
+  sta snd_ptr+1
   pla
-  sta ptr2
+  sta snd_ptr
   rts
 
 music_step:
@@ -172,14 +172,14 @@ lead_note:                 ; A = code: note | $80 bend | $40 slide; $FF off
   lda #0
   sta l_vol
   rts
-: sta t0
+: sta snd_t0
   and #$3F
   tax
   lda PER_L,x
   sta l_tgt
   lda PER_H,x
   sta l_tgt+1
-  lda t0
+  lda snd_t0
   bmi @bend
   and #$40
   bne @slide
@@ -216,19 +216,19 @@ lead_frame:
   lda l_tgt
   sec
   sbc l_per
-  sta t0
+  sta snd_t0
   lda l_tgt+1
   sbc l_per+1
-  sta t1
+  sta snd_t1
   cmp #$80
-  ror t1
-  ror t0
-  lda t1
+  ror snd_t1
+  ror snd_t0
+  lda snd_t1
   cmp #$80
-  ror t1
-  ror t0
-  lda t0
-  ora t1
+  ror snd_t1
+  ror snd_t0
+  lda snd_t0
+  ora snd_t1
   bne :+
   lda l_tgt
   sta l_per
@@ -237,10 +237,10 @@ lead_frame:
   jmp :++
 : lda l_per
   clc
-  adc t0
+  adc snd_t0
   sta l_per
   lda l_per+1
-  adc t1
+  adc snd_t1
   sta l_per+1
 : ; the volume: down to 8 and held
   lda l_age
@@ -252,29 +252,29 @@ lead_frame:
   dec l_vol
 : ; vibrato on long notes
   lda l_per
-  sta t0
+  sta snd_t0
   lda l_per+1
-  sta t1
+  sta snd_t1
   lda l_age
   cmp #18
   bcc @w
   and #8
   beq :+
-  inc t0
+  inc snd_t0
   bne @w
-  inc t1
+  inc snd_t1
   jmp @w
-: lda t0
+: lda snd_t0
   bne :+
-  dec t1
-: dec t0
+  dec snd_t1
+: dec snd_t0
 @w:
   lda l_vol
   ora #$70                 ; 25 % duty, constant volume
   sta $4000
-  lda t0
+  lda snd_t0
   sta $4002
-  lda t1
+  lda snd_t1
   cmp l_hi
   beq :+
   sta l_hi
@@ -289,7 +289,7 @@ twin_note:
   lda #0
   sta t_vol
   rts
-: sta t0
+: sta snd_t0
   and #$3F
   tax
   lda PER_L,x
@@ -302,7 +302,7 @@ twin_note:
   sta t_age
   lda t_mode
   beq @rhythm
-  lda t0                   ; twin: bends like the lead
+  lda snd_t0                   ; twin: bends like the lead
   bpl :+
   dex
   dex
@@ -316,7 +316,7 @@ twin_note:
   sta t_dec
   rts
 @rhythm:
-  lda t0
+  lda snd_t0
   and #$40
   beq :+
   lda #10                  ; palm-muted: a short thud
@@ -341,23 +341,23 @@ twin_frame:
   lda t_tgt
   sec
   sbc t_per
-  sta t0
+  sta snd_t0
   lda t_tgt+1
   sbc t_per+1
-  sta t1
+  sta snd_t1
   cmp #$80
-  ror t1
-  ror t0
-  lda t1
+  ror snd_t1
+  ror snd_t0
+  lda snd_t1
   cmp #$80
-  ror t1
-  ror t0
+  ror snd_t1
+  ror snd_t0
   lda t_per
   clc
-  adc t0
+  adc snd_t0
   sta t_per
   lda t_per+1
-  adc t1
+  adc snd_t1
   sta t_per+1
   lda t_age
   and #7
@@ -375,10 +375,10 @@ twin_frame:
   lsr a
   lsr a
   lsr a
-  sta t0
+  sta snd_t0
   lda t_vol
   sec
-  sbc t0
+  sbc snd_t0
   bcs :+
   lda #0
 : sta t_vol
@@ -415,10 +415,10 @@ bass_note:
   lda #$80
   sta $4008
   rts
-: sta t0
+: sta snd_t0
   and #$7F
   tax
-  lda t0
+  lda snd_t0
   bmi :+
   lda #$18                 ; an eighth: the linear counter stops it (~6 frames)
   bne :++
@@ -670,11 +670,11 @@ sfx_horn:
   sta s_pt
   rts
 
-pulse_sweep:               ; A = rate, X/Y = start period lo/hi, t0 = frames
+pulse_sweep:               ; A = rate, X/Y = start period lo/hi, snd_t0 = frames
   sta s_pk
   stx s_pper
   sty s_pper+1
-  lda t0
+  lda snd_t0
   sta s_pt
   rts
 
@@ -682,7 +682,7 @@ sfx_servo:
   lda s_pt
   bne :+
   lda #18
-  sta t0
+  sta snd_t0
   ldx #<400
   ldy #>400
   lda #12
@@ -691,7 +691,7 @@ sfx_servo:
 
 sfx_leap:
   lda #24
-  sta t0
+  sta snd_t0
   ldx #<600
   ldy #>600
   lda #16
@@ -701,7 +701,7 @@ sfx_chime:
   lda s_pt
   bne :+
   lda #30
-  sta t0
+  sta snd_t0
   ldx #<120
   ldy #>120
   lda #0

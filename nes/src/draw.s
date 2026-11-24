@@ -277,6 +277,13 @@ build_oam:
   cmp #3
   bne @pil0
 @panel:
+  lda #$F0                 ; everything off first (no snow drawn would leave oamn at 0: 'full')
+: sta oam,x
+  inx
+  inx
+  inx
+  inx
+  bne :-
   stx oamn
   stx sprbn
   stx sprbn+1
@@ -350,7 +357,7 @@ draw_things:
   bmi @n
   cmp #4                   ; nearer than 4 m: under the blade
   bcc @n
-  cmp #92
+  cmp #76                  ; past that, lost in the white
   bcs @n
   txa
   sta sortbuf,y
@@ -392,14 +399,44 @@ draw_things:
   iny
   jmp @s
 @sorted:
-  ; the nearest pick the sprite banks first ...
+  ; the nearest picks its sprite bank first; the rest take turns at the other slots (one left out this
+  ; frame flickers, rather than showing up the wrong size)
   lda #0
   sta di
   sta dn
+  sta rr
+  ldx SORTN
+  cpx #3
+  bcc @d
+  dex
+  stx t5
+  lda frame
+: cmp t5
+  bcc :+
+  sbc t5
+  jmp :-
+: sta rr                   ; rotation of entries 1..n-1
 @d:
   lda di
   cmp SORTN
   bcs @emit
+  beq @d0
+  tax
+  beq @d0
+  dex                      ; 1 + (i - 1 + rr) mod (n - 1)
+  txa
+  clc
+  adc rr
+  ldx SORTN
+  dex
+  stx t5
+  cmp t5
+  bcc :+
+  sbc t5
+: tax
+  inx
+  txa
+@d0:
   tax
   lda sortbuf,x
   tax
@@ -706,7 +743,11 @@ draw_one:
   inx
   cpx #3
   bne :-
-  ; no room for its bank: the next size down that is loaded (or always there)
+  ; no room for its bank: far off, the next size down that is loaded (or always there); nearer, it
+  ; sits this frame out
+  lda dbk
+  cmp #4
+  bcc :+
   inc dbk
   lda dbk
   cmp #8
@@ -1116,6 +1157,10 @@ draw_posts:
 @r:
   rts
 
+POST_T:
+  .byte SPT_POST_H2, SPT_POST_H2, SPT_POST_H2, SPT_POST_H3, SPT_POST_H4, SPT_POST_H4, SPT_POST_H6, SPT_POST_H6
+  .byte SPT_POST_H8, SPT_POST_H8, SPT_POST_H10, SPT_POST_H10, SPT_POST_H10, SPT_POST_H13, SPT_POST_H13, SPT_POST_H13
+  .byte SPT_POST_H16
 post_at:                   ; t0:t1 = x + 0.55 m (8.8); ppmh, sy_ set
   lda t0
   sec
@@ -1166,68 +1211,84 @@ post_at:                   ; t0:t1 = x + 0.55 m (8.8); ppmh, sy_ set
   sta t3
   lda #0
   adc t2
-: bne @off
-  ; the bend
-  lda t3
-  sec
-  sbc #3
-  sta t3
-  ; height: 1.4 m up, in px = 1.4 * ppmh
-  lda ppmh
-  ldy #90
+:  sta t2
+  ; the bend: + curv * z / 128 (z whole metres in t5)
+  lda curv
+  beq @nb
+  bpl :+
+  eor #$FF
+  clc
+  adc #1
+: ldy t5
   jsr qmul
-  lsr a
-  ror qlo
-  lsr a
-  ror qlo
-  lsr a
-  ror qlo
-  lsr a
-  ror qlo
-  lsr a
-  ror qlo
-  lsr a
-  ror qlo
-  ; top of the post
-  lda sy_
+  asl qlo
+  rol a
+  sta t4
+  lda curv
+  bmi :+
+  lda t3
+  clc
+  adc t4
+  sta t3
+  bcc @nb
+  inc t2
+  jmp @nb
+: lda t3
   sec
-  sbc qlo
-  sec
-  sbc #1
-  cmp #180
+  sbc t4
+  sta t3
+  bcs @nb
+  dec t2
+@nb:
+  lda t2
+  bne @off
+  lda t3
+  cmp #248
   bcs @off
+  ; height: 1.2 m up, in px = 1.2 * ppmh  (77/64)
+  lda ppmh
+  ldy #77
+  jsr qmul
+  asl qlo
+  rol a
+  asl qlo
+  rol a
+  cmp #2
+  bcc @off                 ; too far to see
+  cmp #33
+  bcs @off
+  sta t4                   ; t4 = height in px
   ldx oamn
   beq @off
-  sta oam,x
-  sta t4
-  lda ppmh
-  cmp #12
-  lda #SPT_POST_TOP_S
-  bcc :+
-  lda #SPT_POST_TOP
-: sta oam+1,x
-  lda #0
-  sta oam+2,x
-  lda t3
-  sta oam+3,x
-  inx
-  inx
-  inx
-  inx
-  ; a second piece for the near ones
-  lda ppmh
-  cmp #12
-  bcc @one
-  beq @one
-  txa
-  beq @one
-  lda t4
-  clc
-  adc #16
-  cmp #180
-  bcs @one
+  cmp #17
+  bcc @short
+  ; tall: the full 16 px stick on the ground, the topped 16 under the reflector
+  lda sy_
+  sec
+  sbc #17
   sta oam,x
   lda #SPT_POST
+  jsr @put
+  beq @one
+  lda sy_
+  sec
+  sbc t4
+  sec
+  sbc #1
+  sta oam,x
+  lda #SPT_POST_H16
+  jsr @put
+  jmp @one
+@short:
+  lda sy_
+  sec
+  sbc #17
+  sta oam,x
+  ldy t4
+  lda POST_T,y
+  jsr @put
+  jmp @one
+@put:                      ; tile in A at oam,x (y already there), x at t3
   sta oam+1,x
   lda #0
   sta oam+2,x
@@ -1237,6 +1298,8 @@ post_at:                   ; t0:t1 = x + 0.55 m (8.8); ppmh, sy_ set
   inx
   inx
   inx
+  txa
+  rts
 @one:
   stx oamn
 @off:
@@ -1261,7 +1324,7 @@ draw_snow:
   lda fl_y,y
   cmp #186
   bcs @new
-  cmp #12
+  cmp #16                  ; (not over the cab roof and the HUD)
   bcc @new
   lda fl_x,y
   cmp #8
